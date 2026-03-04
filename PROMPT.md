@@ -14,6 +14,8 @@ When writing code, write it in a `scratch/` directory. Use this as your working 
 
 When running scripts use pm2 by default. Give these scripts detailed names and tell yourself what you are running in the background if you are doing so. This way you can come back to your running experiments later. 
 
+Try to be proactive and dont just wait and do nothing. If something is running, begin on the next thing in preparation. Go above an beyond, be innovative. Be experimental and accrue as much information as you can about your task. You have this full repo at your disposal it is your home. 
+
 Your goal is described below. Execute it. Dont stop.
 
 ## Goal 
