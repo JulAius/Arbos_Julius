@@ -1,5 +1,6 @@
 import json
 import os
+import selectors
 import subprocess
 import sys
 import time
@@ -285,16 +286,21 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "anthropic/claude-sonnet-4")
 
 
 def _write_claude_settings():
-    """Write project-level .claude/settings.local.json to override any global config."""
+    """Write project-level .claude/settings.local.json.
+
+    Forces OpenRouter as the API backend using OPENROUTER_API_KEY from .env.
+    Overrides any global claude settings that may point elsewhere.
+    """
     settings_dir = WORKING_DIR / ".claude"
     settings_dir.mkdir(exist_ok=True)
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://openrouter.ai/api")
+    if not api_key:
+        _log("WARNING: OPENROUTER_API_KEY not set in .env — claude calls will fail")
     settings = {
         "model": CLAUDE_MODEL,
         "env": {
-            "ANTHROPIC_BASE_URL": base_url,
             "ANTHROPIC_API_KEY": api_key,
+            "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
             "ANTHROPIC_AUTH_TOKEN": "",
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
         },
@@ -305,21 +311,23 @@ def _write_claude_settings():
 
 def _claude_env() -> dict[str, str]:
     env = os.environ.copy()
-    api_key = env.get("OPENROUTER_API_KEY")
+    api_key = env.get("OPENROUTER_API_KEY", "")
     if api_key:
         env["ANTHROPIC_API_KEY"] = api_key
-    env.setdefault("ANTHROPIC_BASE_URL", "https://openrouter.ai/api")
-    env["IS_SANDBOX"] = "1"
+    env["ANTHROPIC_BASE_URL"] = "https://openrouter.ai/api"
+    env["ANTHROPIC_AUTH_TOKEN"] = ""
     return env
 
 
 MAX_RETRIES = int(os.environ.get("CLAUDE_MAX_RETRIES", "5"))
+CLAUDE_TIMEOUT = int(os.environ.get("CLAUDE_TIMEOUT", "600"))
 
 
 def _run_claude_once(cmd, env, on_text=None):
     """Run a single claude subprocess, return (returncode, result_text, raw_lines, stderr).
 
     on_text: optional callback(accumulated_text) fired as assistant text streams in.
+    Kills the process if no output is received for CLAUDE_TIMEOUT seconds.
     """
     proc = subprocess.Popen(
         cmd, cwd=WORKING_DIR, env=env,
@@ -332,32 +340,56 @@ def _run_claude_once(cmd, env, on_text=None):
     complete_texts: list[str] = []
     streaming_tokens: list[str] = []
     raw_lines: list[str] = []
-    for line in iter(proc.stdout.readline, ""):
-        raw_lines.append(line)
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        etype = evt.get("type", "")
-        if etype == "assistant":
-            for block in evt.get("message", {}).get("content", []):
-                if block.get("type") == "text" and block.get("text"):
-                    if evt.get("model_call_id"):
-                        complete_texts.append(block["text"])
-                        streaming_tokens.clear()
-                    else:
-                        streaming_tokens.append(block["text"])
-                        if on_text:
-                            on_text("".join(streaming_tokens))
-        elif etype == "item.completed":
-            item = evt.get("item", {})
-            if item.get("type") == "agent_message" and item.get("text"):
-                complete_texts.append(item["text"])
-                streaming_tokens.clear()
-                if on_text:
-                    on_text(item["text"])
-        elif etype == "result":
-            result_text = evt.get("result", "")
+    timed_out = False
+    last_activity = time.monotonic()
+
+    sel = selectors.DefaultSelector()
+    sel.register(proc.stdout, selectors.EVENT_READ)
+
+    try:
+        while True:
+            ready = sel.select(timeout=min(CLAUDE_TIMEOUT, 30))
+            if not ready:
+                if time.monotonic() - last_activity > CLAUDE_TIMEOUT:
+                    _log(f"claude timeout: no output for {CLAUDE_TIMEOUT}s, killing pid={proc.pid}")
+                    proc.kill()
+                    timed_out = True
+                    break
+                if proc.poll() is not None:
+                    break
+                continue
+            line = proc.stdout.readline()
+            if not line:
+                break
+            last_activity = time.monotonic()
+            raw_lines.append(line)
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            etype = evt.get("type", "")
+            if etype == "assistant":
+                for block in evt.get("message", {}).get("content", []):
+                    if block.get("type") == "text" and block.get("text"):
+                        if evt.get("model_call_id"):
+                            complete_texts.append(block["text"])
+                            streaming_tokens.clear()
+                        else:
+                            streaming_tokens.append(block["text"])
+                            if on_text:
+                                on_text("".join(streaming_tokens))
+            elif etype == "item.completed":
+                item = evt.get("item", {})
+                if item.get("type") == "agent_message" and item.get("text"):
+                    complete_texts.append(item["text"])
+                    streaming_tokens.clear()
+                    if on_text:
+                        on_text(item["text"])
+            elif etype == "result":
+                result_text = evt.get("result", "")
+    finally:
+        sel.unregister(proc.stdout)
+        sel.close()
 
     if not result_text:
         if complete_texts:
@@ -365,7 +397,11 @@ def _run_claude_once(cmd, env, on_text=None):
         elif streaming_tokens:
             result_text = "".join(streaming_tokens)
 
-    stderr_output = proc.stderr.read() if proc.stderr else ""
+    if timed_out:
+        stderr_output = "(timed out)"
+    else:
+        stderr_output = proc.stderr.read() if proc.stderr else ""
+
     returncode = proc.wait()
     return returncode, result_text, raw_lines, stderr_output
 
