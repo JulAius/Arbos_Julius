@@ -966,10 +966,11 @@ def _claude_env() -> dict[str, str]:
     return env
 
 
-def _run_claude_once(cmd, env, on_text=None):
+def _run_claude_once(cmd, env, on_text=None, on_activity=None):
     """Run a single claude subprocess, return (returncode, result_text, raw_lines, stderr).
 
     on_text: optional callback(accumulated_text) fired as assistant text streams in.
+    on_activity: optional callback(status_str) fired on tool use and other activity.
     Kills the process if no output is received for CLAUDE_TIMEOUT seconds.
     """
     proc = subprocess.Popen(
@@ -1013,7 +1014,8 @@ def _run_claude_once(cmd, env, on_text=None):
             etype = evt.get("type", "")
             if etype == "assistant":
                 for block in evt.get("message", {}).get("content", []):
-                    if block.get("type") == "text" and block.get("text"):
+                    btype = block.get("type", "")
+                    if btype == "text" and block.get("text"):
                         if evt.get("model_call_id"):
                             complete_texts.append(block["text"])
                             streaming_tokens.clear()
@@ -1021,6 +1023,10 @@ def _run_claude_once(cmd, env, on_text=None):
                             streaming_tokens.append(block["text"])
                             if on_text:
                                 on_text("".join(streaming_tokens))
+                    elif btype == "tool_use" and on_activity:
+                        tool_name = block.get("name", "")
+                        tool_input = block.get("input", {})
+                        on_activity(_format_tool_activity(tool_name, tool_input))
             elif etype == "item.completed":
                 item = evt.get("item", {})
                 if item.get("type") == "agent_message" and item.get("text"):
@@ -1294,12 +1300,32 @@ def _build_operator_prompt(user_text: str) -> str:
     return "\n\n".join(parts)
 
 
+_TOOL_LABELS = {
+    "Bash": "running command",
+    "Read": "reading",
+    "Write": "writing",
+    "Edit": "editing",
+    "Glob": "searching files",
+    "Grep": "searching code",
+    "WebFetch": "fetching URL",
+    "WebSearch": "searching web",
+    "TodoWrite": "planning",
+    "Task": "running subtask",
+}
+
+
+def _format_tool_activity(tool_name: str, tool_input: dict) -> str:
+    label = _TOOL_LABELS.get(tool_name, tool_name)
+    return f"{label}..."
+
+
 def run_agent_streaming(bot, prompt: str, chat_id: int) -> str:
     """Run Claude Code CLI and stream output into a Telegram message."""
     cmd = _claude_cmd(prompt, extra_flags=["--model", "bot"])
 
-    msg = bot.send_message(chat_id, "Running...")
+    msg = bot.send_message(chat_id, "thinking...")
     current_text = ""
+    activity_status = ""
     last_edit = 0.0
 
     def _edit(text: str, force: bool = False):
@@ -1322,16 +1348,23 @@ def run_agent_streaming(bot, prompt: str, chat_id: int) -> str:
         current_text = text
         _edit(text)
 
+    def _on_activity(status: str):
+        nonlocal activity_status
+        activity_status = status
+        if not current_text:
+            _edit(status)
+
     _claude_semaphore.acquire()
     try:
         env = _claude_env()
 
         for attempt in range(1, MAX_RETRIES + 1):
             current_text = ""
+            activity_status = ""
             last_edit = 0.0
 
             returncode, result_text, raw_lines, stderr_output = _run_claude_once(
-                cmd, env, on_text=_on_text,
+                cmd, env, on_text=_on_text, on_activity=_on_activity,
             )
 
             if result_text.strip():
@@ -1402,7 +1435,10 @@ def run_bot():
     def _reject(message):
         uid = message.from_user.id if message.from_user else None
         _log(f"rejected message from unauthorized user {uid}")
-        bot.send_message(message.chat.id, "Unauthorized.")
+        if not os.environ.get("TELEGRAM_OWNER_ID", "").strip():
+            bot.send_message(message.chat.id, "Send /start to register as the owner.")
+        else:
+            bot.send_message(message.chat.id, "Unauthorized.")
 
     @bot.message_handler(commands=["start"])
     def handle_start(message):
