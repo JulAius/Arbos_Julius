@@ -244,6 +244,8 @@ _claude_semaphore = threading.Semaphore(MAX_CONCURRENT)
 _step_count = 0
 _goal_hash: str = ""
 _goal_step_count = 0
+_token_usage = {"input": 0, "output": 0}
+_token_lock = threading.Lock()
 _child_procs: set[subprocess.Popen] = set()
 _child_procs_lock = threading.Lock()
 
@@ -268,6 +270,23 @@ def fmt_duration(seconds: float) -> str:
         return f"{seconds:.1f}s"
     m, s = divmod(int(seconds), 60)
     return f"{m}m {s}s"
+
+
+def _reset_tokens():
+    with _token_lock:
+        _token_usage["input"] = 0
+        _token_usage["output"] = 0
+
+
+def _get_tokens() -> tuple[int, int]:
+    with _token_lock:
+        return _token_usage["input"], _token_usage["output"]
+
+
+def fmt_tokens(inp: int, out: int) -> str:
+    def _k(n: int) -> str:
+        return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+    return f"{_k(inp)} in / {_k(out)} out"
 
 
 # ── Prompt helpers ───────────────────────────────────────────────────────────
@@ -659,8 +678,14 @@ async def _stream_openai_to_anthropic(oai_response: httpx.Response, model: str):
 
         if chunk.get("usage"):
             u = chunk["usage"]
-            usage["input_tokens"] = u.get("prompt_tokens", usage["input_tokens"])
-            usage["output_tokens"] = u.get("completion_tokens", usage["output_tokens"])
+            new_in = u.get("prompt_tokens", 0)
+            new_out = u.get("completion_tokens", 0)
+            if new_in or new_out:
+                with _token_lock:
+                    _token_usage["input"] += new_in
+                    _token_usage["output"] += new_out
+            usage["input_tokens"] = new_in or usage["input_tokens"]
+            usage["output_tokens"] = new_out or usage["output_tokens"]
 
         choices = chunk.get("choices", [])
         if not choices:
@@ -903,6 +928,11 @@ async def _proxy_messages(request: Request):
                     })
                 oai_data = resp.json()
                 actual_model = oai_data.get("model", "?")
+                u = oai_data.get("usage", {})
+                if u:
+                    with _token_lock:
+                        _token_usage["input"] += u.get("prompt_tokens", 0)
+                        _token_usage["output"] += u.get("completion_tokens", 0)
                 _log(f"proxy: response [{routing}] via {routing_label} model={actual_model}")
                 return JSONResponse(content=_openai_response_to_anthropic(oai_data, model))
             except httpx.TimeoutException:
@@ -1175,9 +1205,13 @@ def run_step(prompt: str, step_number: int, goal_step: int = 0) -> bool:
         STEP_MSG_FILE.write_text(json.dumps({"msg_id": step_msg_id, "text": text}))
         last_edit = now
 
+    _reset_tokens()
+
     def _on_activity(status: str):
         elapsed = fmt_duration(time.monotonic() - t0)
-        _edit_step_msg(f"{step_label} ({elapsed})\n{status}")
+        inp, out = _get_tokens()
+        tok = f" | {fmt_tokens(inp, out)}" if (inp or out) else ""
+        _edit_step_msg(f"{step_label} ({elapsed}{tok})\n{status}")
 
     success = False
     try:
@@ -1224,7 +1258,9 @@ def run_step(prompt: str, step_number: int, goal_step: int = 0) -> bool:
                 except (json.JSONDecodeError, KeyError):
                     pass
 
-            parts = [f"{step_label} ({elapsed}, {status})"]
+            inp, out = _get_tokens()
+            tok = f" | {fmt_tokens(inp, out)}" if (inp or out) else ""
+            parts = [f"{step_label} ({elapsed}, {status}{tok})"]
             if agent_text:
                 parts.append(agent_text)
             if rollout.strip():
