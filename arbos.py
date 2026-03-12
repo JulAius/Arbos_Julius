@@ -33,6 +33,7 @@ INBOX_FILE = CONTEXT_DIR / "INBOX.md"
 RUNS_DIR = CONTEXT_DIR / "runs"
 CHATLOG_DIR = CONTEXT_DIR / "chat"
 RESTART_FLAG = WORKING_DIR / ".restart"
+STEP_MSG_FILE = CONTEXT_DIR / ".step_msg"
 CHAT_ID_FILE = WORKING_DIR / "chat_id.txt"
 ENV_ENC_FILE = WORKING_DIR / ".env.enc"
 
@@ -391,12 +392,49 @@ def _send_telegram_text(text: str, *, target: tuple[str, str] | None = None) -> 
         )
         response.raise_for_status()
     except Exception as exc:
-        _log(f"step update send failed: {str(exc)[:120]}")
+        _log(f"telegram send failed: {str(exc)[:120]}")
         return False
     log_chat("bot", text[:1000])
-    _log("step update sent to Telegram")
+    _log("telegram message sent")
     return True
 
+
+def _send_telegram_new(text: str, *, target: tuple[str, str] | None = None) -> int | None:
+    """Send a new Telegram message and return its message_id."""
+    target = target or _step_update_target()
+    if not target:
+        return None
+    token, chat_id = target
+    text = _redact_secrets(text)
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text[:4000]},
+            timeout=15,
+        )
+        response.raise_for_status()
+        return response.json().get("result", {}).get("message_id")
+    except Exception as exc:
+        _log(f"telegram send failed: {str(exc)[:120]}")
+        return None
+
+
+def _edit_telegram_text(message_id: int, text: str, *, target: tuple[str, str] | None = None) -> bool:
+    """Edit an existing Telegram message."""
+    target = target or _step_update_target()
+    if not target:
+        return False
+    token, chat_id = target
+    text = _redact_secrets(text)
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{token}/editMessageText",
+            json={"chat_id": chat_id, "message_id": message_id, "text": text[:4000]},
+            timeout=15,
+        )
+        return True
+    except Exception:
+        return False
 
 
 # ── Chutes proxy (Anthropic Messages API → OpenAI Chat Completions) ──────────
@@ -1106,6 +1144,8 @@ def run_step(prompt: str, step_number: int) -> bool:
     with _log_lock:
         _log_fh = open(log_file, "a", encoding="utf-8")
 
+    STEP_MSG_FILE.unlink(missing_ok=True)
+
     success = False
     try:
         _log(f"run dir {run_dir}")
@@ -1635,7 +1675,11 @@ def _kill_stale_claude_procs():
 
 
 def _send_cli(args: list[str]):
-    """CLI entry point: python arbos.py send 'message' [--file path]"""
+    """CLI entry point: python arbos.py send 'message' [--file path]
+
+    Within a step, all sends are consolidated into a single Telegram message.
+    The first send creates it; subsequent sends edit it by appending.
+    """
     import argparse
     parser = argparse.ArgumentParser(description="Send a Telegram message to the operator")
     parser.add_argument("message", nargs="?", help="Message text to send")
@@ -1650,11 +1694,44 @@ def _send_cli(args: list[str]):
     else:
         text = parsed.message
 
-    if _send_telegram_text(text):
-        print(f"Sent ({len(text)} chars)")
+    STEP_MSG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    if STEP_MSG_FILE.exists():
+        try:
+            state = json.loads(STEP_MSG_FILE.read_text())
+            msg_id = state["msg_id"]
+            prev_text = state.get("text", "")
+        except (json.JSONDecodeError, KeyError):
+            msg_id = None
+            prev_text = ""
     else:
-        print("Failed to send (check TAU_BOT_TOKEN and chat_id.txt)", file=sys.stderr)
-        sys.exit(1)
+        msg_id = None
+        prev_text = ""
+
+    if msg_id:
+        combined = (prev_text + "\n\n" + text).strip()
+        if _edit_telegram_text(msg_id, combined):
+            STEP_MSG_FILE.write_text(json.dumps({"msg_id": msg_id, "text": combined}))
+            log_chat("bot", combined[:1000])
+            print(f"Edited step message ({len(combined)} chars)")
+        else:
+            new_id = _send_telegram_new(text)
+            if new_id:
+                STEP_MSG_FILE.write_text(json.dumps({"msg_id": new_id, "text": text}))
+                log_chat("bot", text[:1000])
+                print(f"Sent new message ({len(text)} chars)")
+            else:
+                print("Failed to send", file=sys.stderr)
+                sys.exit(1)
+    else:
+        new_id = _send_telegram_new(text)
+        if new_id:
+            STEP_MSG_FILE.write_text(json.dumps({"msg_id": new_id, "text": text}))
+            log_chat("bot", text[:1000])
+            print(f"Sent ({len(text)} chars)")
+        else:
+            print("Failed to send (check TAU_BOT_TOKEN and chat_id.txt)", file=sys.stderr)
+            sys.exit(1)
 
 
 def main() -> None:
@@ -1699,6 +1776,8 @@ def main() -> None:
     time.sleep(1)
 
     _write_claude_settings()
+
+    _send_telegram_text("Restarted.")
 
     threading.Thread(target=agent_loop, daemon=True).start()
     threading.Thread(target=run_bot, daemon=True).start()
