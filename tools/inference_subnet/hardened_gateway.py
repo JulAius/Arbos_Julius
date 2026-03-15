@@ -70,11 +70,15 @@ from collusion_detector import (
 
 log = logging.getLogger("hardened_gateway")
 log.setLevel(logging.INFO)
-if not log.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-    log.addHandler(_handler)
+# Force exactly one handler to sys.stdout — clear any duplicates
+log.handlers.clear()
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+log.addHandler(_handler)
 log.propagate = False
+# Prevent root logger from adding a second output path
+logging.root.handlers.clear()
+logging.root.addHandler(logging.NullHandler())
 
 # Version tracking for watchtower/deployment debugging
 GATEWAY_VERSION = "0.3.0"
@@ -195,7 +199,16 @@ try:
         wait_for_finalization=True,
         period=None,
     )
-    print(f"OK:{{response}}")
+    # response is (bool, message) — check success flag
+    if isinstance(response, (tuple, list)):
+        success, msg = response[0], response[1] if len(response) > 1 else ""
+        if success:
+            print(f"OK:{{response}}")
+        else:
+            print(f"ERR:set_weights returned False: {{msg}}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(f"OK:{{response}}")
 except Exception as e:
     print(f"ERR:{{e}}", file=sys.stderr)
     sys.exit(1)
@@ -250,9 +263,11 @@ class RealValidatorModel:
     """
 
     def __init__(self, model_name: str):
+        import threading
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        self._lock = threading.Lock()
         trust_remote = os.getenv("TRUST_REMOTE_CODE", "0") == "1"
         log.info(f"Loading validator model: {model_name} (trust_remote_code={trust_remote})")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote)
@@ -331,38 +346,35 @@ class RealValidatorModel:
         }
 
     def compute_hidden_state_at(self, tokens: list[int], layer: int, position: int) -> np.ndarray:
-        """Compute hidden state at a single (layer, position) for verification."""
-        # Run forward pass with all tokens up to the requested position
-        input_ids = self._torch.tensor([tokens[:position + 1]], device=self._device)
-        with self._torch.no_grad():
-            outputs = self.model(input_ids, output_hidden_states=True)
-        # outputs.hidden_states: tuple of (num_layers+1) tensors, each (1, seq_len, hidden_dim)
-        vec = outputs.hidden_states[layer + 1][0][-1].cpu().float().numpy()
+        """Compute hidden state at a single (layer, position) for verification.
+        Thread-safe: serialized via lock to prevent concurrent forward pass corruption."""
+        with self._lock:
+            input_ids = self._torch.tensor([tokens[:position + 1]], device=self._device)
+            with self._torch.no_grad():
+                outputs = self.model(input_ids, output_hidden_states=True)
+            vec = outputs.hidden_states[layer + 1][0][-1].cpu().float().numpy()
         norm = np.linalg.norm(vec)
         if norm > 0:
             vec = vec / norm
         return vec
 
     def compute_hidden_states_batch(self, tokens: list[int], points: list[tuple[int, int]]) -> dict:
-        """
-        Compute hidden states at multiple (layer, position) points in a single forward pass.
-        Much faster than calling compute_hidden_state_at for each point.
-        Returns {(layer, position): np.ndarray}
-        """
+        """Compute hidden states at multiple (layer, position) points in a single forward pass.
+        Thread-safe: serialized via lock to prevent concurrent forward pass corruption."""
         if not points:
             return {}
-        # Find the maximum position needed
-        max_pos = max(pos for _, pos in points)
-        input_ids = self._torch.tensor([tokens[:max_pos + 1]], device=self._device)
-        with self._torch.no_grad():
-            outputs = self.model(input_ids, output_hidden_states=True)
-        result = {}
-        for layer, pos in points:
-            vec = outputs.hidden_states[layer + 1][0][pos].cpu().float().numpy()
-            norm = np.linalg.norm(vec)
-            if norm > 0:
-                vec = vec / norm
-            result[(layer, pos)] = vec
+        with self._lock:
+            max_pos = max(pos for _, pos in points)
+            input_ids = self._torch.tensor([tokens[:max_pos + 1]], device=self._device)
+            with self._torch.no_grad():
+                outputs = self.model(input_ids, output_hidden_states=True)
+            result = {}
+            for layer, pos in points:
+                vec = outputs.hidden_states[layer + 1][0][pos].cpu().float().numpy()
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    vec = vec / norm
+                result[(layer, pos)] = vec
         return result
 
 
@@ -791,7 +803,7 @@ class IntelligentRouter:
         weights = []
         miner_list = list(alive_miners.values())
         for m in miner_list:
-            load_factor = 1.0 / (1.0 + m.active_requests)
+            load_factor = 0.5 ** m.active_requests  # Match select_miner's exponential decay
             speed_factor = self._compute_speed_factor(m)
             w = m.reliability_score * load_factor * speed_factor
             weights.append(max(w, 0.001))
@@ -3499,7 +3511,12 @@ async def run_gateway(args):
     auditor_url = getattr(args, 'auditor_url', None)
 
     async def auditor_poll_loop():
-        """Periodically fetch challenge data from external audit_validator."""
+        """Periodically fetch challenge data from external audit_validator.
+
+        In split architecture, the gateway defers all challenges to the auditor.
+        This loop syncs challenge pass/fail counts back into the gateway's scorer
+        so weight computation doesn't penalize miners for 'zero challenges'.
+        """
         if not auditor_url:
             return
         import aiohttp
@@ -3522,6 +3539,17 @@ async def run_gateway(args):
                                 # Block miners with very low pass_rate AND negative score
                                 elif requests >= 8 and pass_rate < 0.3 and net_points <= 0:
                                     blocked.add(uid)
+
+                                # Sync challenge counts from auditor into gateway scorer.
+                                # The gateway's own scorer sees challenge_passed=None for
+                                # all deferred requests, so without this sync, every miner
+                                # hits the "zero challenges" 0.05x weight penalty.
+                                auditor_passed = m.get("passed_challenges", 0)
+                                auditor_failed = m.get("failed_challenges", 0)
+                                if auditor_passed + auditor_failed > 0:
+                                    stats = validator.scoring._get_stats(uid)
+                                    stats.passed_challenges = auditor_passed
+                                    stats.failed_challenges = auditor_failed
                             validator.router.update_auditor_blocked(blocked)
             except Exception as e:
                 log.debug(f"[AUDITOR-POLL] Error: {e}")
@@ -3573,7 +3601,7 @@ async def run_gateway(args):
 
     app = create_gateway_app(validator)
 
-    uvi_config = uvicorn.Config(app, host="0.0.0.0", port=args.port, log_level="warning")
+    uvi_config = uvicorn.Config(app, host="0.0.0.0", port=args.port, log_level="warning", log_config=None)
     server = uvicorn.Server(uvi_config)
 
     async def server_task():
@@ -3581,6 +3609,9 @@ async def run_gateway(args):
 
     async def main_loop():
         await asyncio.sleep(1)
+        # Clear root logger handlers that uvicorn.Server.serve() may have added
+        # despite log_config=None (uvicorn's startup still calls logging.config)
+        logging.root.handlers.clear()
         log.info(f"Hardened Gateway v{GATEWAY_VERSION} running on port {args.port}")
         log.info(f"Miners: {args.miners}")
         log.info(f"Epoch: {args.epoch_length}s | Synthetic interval: ~{args.synthetic_interval}s (with jitter)")
