@@ -1215,9 +1215,15 @@ def _write_claude_settings():
         "model": CLAUDE_MODEL,
         "permissions": {
             "allow": [
-                "Bash(*)", "Read(*)", "Write(*)", "Edit(*)",
-                "Glob(*)", "Grep(*)", "WebFetch(*)", "WebSearch(*)",
-                "TodoWrite(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"
+                "Agent(*)", "AskUserQuestion(*)", "Bash(*)", "CronCreate(*)",
+                "CronDelete(*)", "CronList(*)", "Edit(*)", "EnterPlanMode(*)",
+                "EnterWorktree(*)", "ExitPlanMode(*)", "ExitWorktree(*)",
+                "Glob(*)", "Grep(*)", "ListMcpResourcesTool(*)", "LSP(*)",
+                "NotebookEdit(*)", "Read(*)", "ReadMcpResourceTool(*)",
+                "Skill(*)", "TaskCreate(*)", "TaskGet(*)", "TaskList(*)",
+                "TaskOutput(*)", "TaskStop(*)", "TaskUpdate(*)",
+                "TodoWrite(*)", "ToolSearch(*)", "WebFetch(*)",
+                "WebSearch(*)", "Write(*)"
             ],
         },
         "env": env_block,
@@ -1786,7 +1792,7 @@ _TOOL_LABELS = {
     "WebSearch": "browsing",
     "TodoWrite": "planning",
     "Task": "executing",
-    "Agent": "executing"
+    "Agent": "executing",
 }
 
 
@@ -1809,6 +1815,7 @@ def _format_tool_activity(tool_name: str, tool_input: dict) -> str:
         detail = (tool_input.get("query") or tool_input.get("search_term") or "")[:60]
     elif tool_name == "Task":
         detail = (tool_input.get("description") or "")[:60]
+
     if detail:
         return f"{label}: {detail}"
     return f"{label}..."
