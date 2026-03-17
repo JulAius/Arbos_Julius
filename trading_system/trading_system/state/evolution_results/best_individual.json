@@ -1,0 +1,17 @@
+{
+  "name": "BaselineMomentumModel_mut_5d5a98a0",
+  "model_class": "BaselineMomentumModel",
+  "hyperparams": {
+    "horizon": 1,
+    "volume_period": "48",
+    "momentum_periods": "24",
+    "signal_threshold": 0.1535227003337502
+  },
+  "fitness": 0.4671280276816609,
+  "fitness_details": {
+    "train_accuracy": 0.5060975609756098,
+    "train_mse": 0.3845381388246008,
+    "validation_metric": 0.4671280276816609
+  },
+  "is_evaluated": true
+}

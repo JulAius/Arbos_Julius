@@ -1,0 +1,17 @@
+{
+  "name": "gen0_ind0",
+  "model_class": "BaselineMomentumModel",
+  "hyperparams": {
+    "horizon": 1,
+    "momentum_periods": "24",
+    "volume_period": "12",
+    "signal_threshold": 0.4
+  },
+  "fitness": -4.590095890027248,
+  "fitness_details": {
+    "train_accuracy": 0.4634146341463415,
+    "train_mse": 1.0000075321026412,
+    "validation_metric": -4.590095890027248
+  },
+  "is_evaluated": true
+}

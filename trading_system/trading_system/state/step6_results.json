@@ -1,0 +1,24 @@
+{
+  "step": 6,
+  "timestamp": "2026-03-17T17:38:01.889511",
+  "evolution": {
+    "population_size": 50,
+    "generations": 20,
+    "fitness_metric": "directional_accuracy",
+    "best_individual": {
+      "hyperparams": {
+        "horizon": "1",
+        "volume_period": "48",
+        "momentum_periods": "24",
+        "signal_threshold": "0.1535227003337502"
+      },
+      "fitness": 0.4671280276816609
+    }
+  },
+  "validation": {
+    "note": "Fitness computed during evolution via cross-validation",
+    "directional_accuracy": 0.4671280276816609,
+    "signal_threshold": 0.1535227003337502
+  },
+  "goal_achieved": false
+}

@@ -224,7 +224,7 @@ PROXY_TIMEOUT = int(os.environ.get("PROXY_TIMEOUT", "600"))
 CHUTES_API_KEY = os.environ.get("CHUTES_API_KEY", "")
 
 if PROVIDER == "openrouter":
-    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "anthropic/claude-opus-4.6")
+    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "stepfun/step-3.5-flash:free")
     LLM_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
     LLM_BASE_URL = "https://openrouter.ai/api"
     COST_PER_M_INPUT = float(os.environ.get("COST_PER_M_INPUT", "5.00"))
@@ -1195,9 +1195,9 @@ def _write_claude_settings():
 
     if PROVIDER == "openrouter":
         env_block = {
-            "ANTHROPIC_API_KEY": LLM_API_KEY,
+            "ANTHROPIC_API_KEY": "",
             "ANTHROPIC_BASE_URL": LLM_BASE_URL,
-            "ANTHROPIC_AUTH_TOKEN": "",
+            "ANTHROPIC_AUTH_TOKEN": LLM_API_KEY,
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
         }
         target_label = LLM_BASE_URL
@@ -1217,7 +1217,7 @@ def _write_claude_settings():
             "allow": [
                 "Bash(*)", "Read(*)", "Write(*)", "Edit(*)",
                 "Glob(*)", "Grep(*)", "WebFetch(*)", "WebSearch(*)",
-                "TodoWrite(*)", "NotebookEdit(*)", "Task(*)",
+                "TodoWrite(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"
             ],
         },
         "env": env_block,
@@ -1232,9 +1232,9 @@ def _claude_env(goal_index: int = 0) -> dict[str, str]:
     if goal_index:
         env["ARBOS_GOAL_INDEX"] = str(goal_index)
     if PROVIDER == "openrouter":
-        env["ANTHROPIC_API_KEY"] = LLM_API_KEY
+        env["ANTHROPIC_API_KEY"] = ""
         env["ANTHROPIC_BASE_URL"] = LLM_BASE_URL
-        env["ANTHROPIC_AUTH_TOKEN"] = ""
+        env["ANTHROPIC_AUTH_TOKEN"] = LLM_API_KEY
     else:
         env["ANTHROPIC_API_KEY"] = "chutes-proxy"
         env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{PROXY_PORT}"
@@ -1786,6 +1786,7 @@ _TOOL_LABELS = {
     "WebSearch": "browsing",
     "TodoWrite": "planning",
     "Task": "executing",
+    "Agent": "executing"
 }
 
 
