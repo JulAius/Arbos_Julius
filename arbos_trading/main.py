@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import pickle
+import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Generator, Tuple, Optional
@@ -581,6 +582,9 @@ class TradingSystem:
 
 def main():
     """Entry point for running the trading system."""
+    # Fix global random seeds for reproducible population initialization and training
+    np.random.seed(42)
+    random.seed(42)
     print("[main] main() started", flush=True)
     system = TradingSystem()
 

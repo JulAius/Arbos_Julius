@@ -484,7 +484,8 @@ class LightGBMModel(BaseModel):
             min_child_samples=min_child_samples,
             random_state=random_state,
             verbose=-1,
-            n_jobs=1
+            n_jobs=1,
+            force_row_wise=True  # deterministic: disable parallel histogram building
         )
         self._params = {
             "n_estimators": n_estimators,
