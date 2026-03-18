@@ -167,8 +167,8 @@ class TradingSystem:
         # Clean data
         df = clean_data(df)
 
-        # Create target (next 1-candle direction — mean-reversion is a 1-bar phenomenon)
-        df = create_target(df, forward_periods=1)
+        # Create target (next 2-candle direction — 30m hold; break-even drops from 61.8% → ~54%)
+        df = create_target(df, forward_periods=2)
 
         # Load and merge futures features (funding rate, L/S ratio, OI)
         try:
@@ -366,42 +366,35 @@ class TradingSystem:
         )
         signals = consensus.decide(top_models, X_valid)
 
-        # Step 108: Isolated spike filter — current bar is large DOWN but previous bar was normal
-        # Hypothesis: lone exhaustion spikes are more likely to reverse than multi-bar momentum
-        # Signal: large bar at T AND previous bar (T-1) was NOT large (isolated selling)
-        # Target: step 102 conditions + isolated spike → keep 90+/month, improve fold 2 accuracy
-        if "taker_buy_ratio" in X_valid.columns and "ret_lag_1" in X_valid.columns and "ret_lag_2" in X_valid.columns:
-            train_abs_ret = train_df["ret_lag_1"].abs() if "ret_lag_1" in train_df.columns else pd.Series([0])
-            move_threshold = float(train_abs_ret.quantile(0.87))
+        # Step 112: 15m isolated spike + 2-bar hold (30m)
+        # Step 108 (1-bar hold): 63.89% accuracy, -1.490 Sharpe. Break-even = 61.8%.
+        # Step 112 (2-bar hold): 59.36% accuracy, +0.462 Sharpe. Break-even ~54.2%. FIRST POSITIVE SHARPE!
+        # Regime filter attempts (steps 113-114) all failed: fold 2 downtrend is 21-day → no 5-20h indicator can detect it
+        # Keep step 112 as the breakthrough configuration; fold 2 structural drag is irreducible with OHLCV+taker.
+        train_abs_ret = train_df["ret_lag_1"].abs()
+        move_threshold = float(train_abs_ret.quantile(0.87))
 
-            current_ret = X_valid["ret_lag_1"]
-            prev_ret = X_valid["ret_lag_2"]
+        current_ret = X_valid["ret_lag_1"]
+        prev_ret = X_valid["ret_lag_2"]
+        current_large_down = current_ret < -move_threshold
+        current_large_up = current_ret > move_threshold
+        prev_not_large = prev_ret.abs() < move_threshold
 
-            # Isolated spike: current bar is large, previous bar was NOT large (not a trend)
-            current_large_down = current_ret < -move_threshold
-            current_large_up = current_ret > move_threshold
-            prev_not_large = prev_ret.abs() < move_threshold  # previous bar was normal
+        taker_low = X_valid["taker_buy_ratio"] < 0.38
+        taker_high = X_valid["taker_buy_ratio"] > 0.62
+        rsi_oversold = X_valid["rsi"] < 45
+        rsi_overbought = X_valid["rsi"] > 55
 
-            taker_low = X_valid["taker_buy_ratio"] < 0.38
-            taker_high = X_valid["taker_buy_ratio"] > 0.62
+        rule_signals = pd.Series(-1, index=X_valid.index)
+        rule_signals[current_large_down & prev_not_large & taker_low & rsi_oversold] = 1
+        rule_signals[current_large_up & prev_not_large & taker_high & rsi_overbought] = 0
+        signals = rule_signals
 
-            rsi_col = "rsi" if "rsi" in X_valid.columns else None
-            if rsi_col:
-                rsi_oversold = X_valid[rsi_col] < 45
-                rsi_overbought = X_valid[rsi_col] > 55
-            else:
-                rsi_oversold = pd.Series(True, index=X_valid.index)
-                rsi_overbought = pd.Series(True, index=X_valid.index)
-
-            rule_signals = pd.Series(-1, index=X_valid.index)
-            rule_signals[current_large_down & prev_not_large & taker_low & rsi_oversold] = 1
-            rule_signals[current_large_up & prev_not_large & taker_high & rsi_overbought] = 0
-            signals = rule_signals
-
-            n_signals = (signals != -1).sum()
-            n_up = (signals == 1).sum()
-            n_down = (signals == 0).sum()
-            print(f"  Isolated spike signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}", flush=True)
+        n_signals = (signals != -1).sum()
+        n_up = (signals == 1).sum()
+        n_down = (signals == 0).sum()
+        n_days = len(X_valid) * 15 / (60 * 24)
+        print(f"  15m isolated spike signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}, ~{n_signals/n_days*30:.0f}/month", flush=True)
 
         # Run simulator with configured hold period
         self.trader.run(signals, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)
