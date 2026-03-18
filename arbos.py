@@ -264,8 +264,6 @@ FALLBACK_BASE_URL = "https://openrouter.ai/api" if FALLBACK_PROVIDER == "openrou
 AUTO_PUSH = os.environ.get("AUTO_PUSH", "").lower() in ("1", "true", "yes")
 AUTO_PUSH_REMOTE = os.environ.get("AUTO_PUSH_REMOTE", "origin")
 AUTO_PUSH_BRANCH = os.environ.get("AUTO_PUSH_BRANCH", "main")
-PUSH_MIN_ACCURACY = float(os.environ.get("PUSH_MIN_ACCURACY", "0.60"))
-PUSH_MIN_SHARPE = float(os.environ.get("PUSH_MIN_SHARPE", "0"))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 _provider_lock = threading.Lock()
@@ -1608,50 +1606,19 @@ def run_step(prompt: str, step_number: int, goal_index: int = 0, goal_step: int 
 
 # ── Auto-push on profitable results ──────────────────────────────────────────
 
-def _find_latest_metrics() -> dict | None:
-    results_dir = WORKING_DIR / "results"
-    if not results_dir.exists():
-        return None
-    runs = sorted(results_dir.iterdir(), reverse=True)
-    for run_dir in runs[:5]:
-        mf = run_dir / "metrics.json"
-        if mf.exists():
-            try:
-                return json.loads(mf.read_text())
-            except Exception:
-                continue
-    return None
-
-
-def _is_profitable(metrics: dict) -> bool:
-    accuracy = metrics.get("accuracy", 0)
-    sharpe = metrics.get("sharpe", -999)
-    return accuracy >= PUSH_MIN_ACCURACY and sharpe >= PUSH_MIN_SHARPE
-
-
 def _auto_push_if_profitable(step_num: int, goal_index: int = 1):
+    """Push changes to GitHub when the agent requests it via .autopush flag."""
     if not AUTO_PUSH:
         return
 
     autopush_flag = WORKING_DIR / ".autopush"
-    metrics = _find_latest_metrics()
-    agent_requested = autopush_flag.exists()
-
-    if not agent_requested and not (metrics and _is_profitable(metrics)):
+    if not autopush_flag.exists():
         return
 
-    if agent_requested:
-        flag_msg = autopush_flag.read_text().strip()
-        autopush_flag.unlink(missing_ok=True)
+    flag_msg = autopush_flag.read_text().strip()
+    autopush_flag.unlink(missing_ok=True)
 
     try:
-        diff = subprocess.run(
-            ["git", "diff", "--stat", "HEAD"],
-            cwd=WORKING_DIR, capture_output=True, text=True, timeout=10,
-        )
-        if not diff.stdout.strip():
-            return
-
         subprocess.run(
             ["git", "add", "-A",
              "--", ".", ":!.env", ":!.env.*", ":!context/", ":!logs/"],
@@ -1663,17 +1630,10 @@ def _auto_push_if_profitable(step_num: int, goal_index: int = 1):
             cwd=WORKING_DIR, capture_output=True, text=True, timeout=10,
         )
         if not status.stdout.strip():
+            _log("auto-push: nothing to commit")
             return
 
-        if metrics and _is_profitable(metrics):
-            acc = metrics.get("accuracy", 0)
-            sharpe = metrics.get("sharpe", 0)
-            bets = metrics.get("bets_per_month", 0)
-            msg = f"auto: step {step_num} goal #{goal_index} — acc={acc:.1%} sharpe={sharpe:.1f} bets/mo={bets:.0f}"
-        elif agent_requested:
-            msg = flag_msg or f"auto: step {step_num} goal #{goal_index} — agent-requested push"
-        else:
-            msg = f"auto: step {step_num} goal #{goal_index}"
+        msg = flag_msg or f"auto: step {step_num} goal #{goal_index}"
 
         r = subprocess.run(
             ["git", "commit", "-m", msg],

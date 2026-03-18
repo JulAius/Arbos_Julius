@@ -85,20 +85,21 @@ FALLBACK_MODEL=stepfun/step-3.5-flash:free
 OPENROUTER_API_KEY=sk-or-...    # fallback API key
 TAU_BOT_TOKEN=...               # Telegram bot token
 TELEGRAM_OWNER_ID=...           # your Telegram user ID
-AUTO_PUSH=true                  # auto-push profitable changes
-PUSH_MIN_ACCURACY=0.60          # minimum accuracy to push
-PUSH_MIN_SHARPE=0               # minimum Sharpe to push
+AUTO_PUSH=true                  # enable agent-triggered auto-push
 GITHUB_TOKEN=ghp_...            # GitHub token for auto-push
 ```
 
 ## Auto-push
 
-When `AUTO_PUSH=true`, Arbos automatically commits and pushes code changes to GitHub after each successful step — **only if** the latest results meet profitability thresholds:
+When `AUTO_PUSH=true`, the agent can trigger a git push by creating a `.autopush` file. This keeps the decision logic in the goal/prompt, not hardcoded in arbos.py.
 
-- `accuracy >= PUSH_MIN_ACCURACY` (default 0.60)
-- `sharpe >= PUSH_MIN_SHARPE` (default 0)
+**How it works:**
+1. The agent decides when changes are worth pushing (profitable results, working code, etc.)
+2. The agent writes `touch .autopush` or `echo "commit message" > .autopush`
+3. After the step, Arbos detects the flag → `git add` → `git commit` → `git push`
+4. The flag is consumed (deleted) after processing
 
-The agent can also force a push by creating a `.autopush` file (with an optional commit message inside).
+The commit message is the content of `.autopush`, or a default `auto: step N goal #X` if empty.
 
 Excluded from auto-push: `.env`, `context/`, `logs/`.
 
