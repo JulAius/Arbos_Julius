@@ -1,0 +1,234 @@
+[main] main() started
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Loaded 77450 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-17 18:15:00
+Online mode: limited data to last 90 days (8641 rows)
+[main] Starting feature preparation...
+Preparing features...
+  Generating horizon features...
+[horizon] Starting feature generation: 8641 rows, horizons=['15m', '1h', '4h', '8h', '12h', '24h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 31 features for horizon 15m...
+[horizon]   Merged (result now has 8641 rows, 32 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 2161 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (2161 rows)
+[horizon] Merging 31 features for horizon 1h...
+[horizon]   Merged (result now has 8641 rows, 63 cols)
+[horizon] Horizon 4h: resampling by factor 16...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 541 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 4h features prepared (541 rows)
+[horizon] Merging 31 features for horizon 4h...
+[horizon]   Merged (result now has 8641 rows, 94 cols)
+[horizon] Horizon 8h: resampling by factor 32...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 271 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 8h features prepared (271 rows)
+[horizon] Merging 31 features for horizon 8h...
+[horizon]   Merged (result now has 8641 rows, 125 cols)
+[horizon] Horizon 12h: resampling by factor 48...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 181 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 12h features prepared (181 rows)
+[horizon] Merging 31 features for horizon 12h...
+[horizon]   Merged (result now has 8641 rows, 156 cols)
+[horizon] Horizon 24h: resampling by factor 96...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 91 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 24h features prepared (91 rows)
+[horizon] Merging 31 features for horizon 24h...
+[horizon]   Merged (result now has 8641 rows, 187 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 8641 rows, 187 columns
+Prepared 6794 samples with 196 columns
+Feature count: 186
+[main] Feature preparation complete: 6794 rows, 186 features
+Limited training to 3000 most recent samples
+Evolving population (input_dim=186)...
+  Generation 1/1
+    Training individual 1/5 (random_forest)
+      -> fitness=0.8577
+    Training individual 2/5 (random_forest)
+      -> fitness=0.8577
+    Training individual 3/5 (gradient_boosting)
+      -> fitness=0.8487
+    Training individual 4/5 (random_forest)
+      -> fitness=0.7923
+    Training individual 5/5 (gradient_boosting)
+      -> fitness=0.7920
+    Best fitness: 0.8577 (model=random_forest)
+Using 6794 recent samples for walk-forward validation (max 90 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/3: train=746, valid=2016
+    Gen 1: best_train_fitness=0.9544 (gradient_boosting)
+  Model 1: profit_factor=0.4861
+  Model 2: profit_factor=0.3863
+  Model 3: profit_factor=0.6220
+  Model 4: profit_factor=0.5259
+  Model 5: profit_factor=0.6415
+Fold result: accuracy=0.7041, bets/month=1032.06, trades=712, sharpe=1.517
+
+Fold 2/3: train=2762, valid=2016
+    Gen 1: best_train_fitness=0.8429 (random_forest)
+  Model 1: profit_factor=0.9541
+  Model 2: profit_factor=0.8814
+  Model 3: profit_factor=1.1003
+  Model 4: profit_factor=1.0557
+  Model 5: profit_factor=1.0959
+Fold result: accuracy=0.8403, bets/month=726.21, trades=501, sharpe=44.678
+
+Fold 3/3: train=3000, valid=2016
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/linear_model/_sag.py:348: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+    Gen 1: best_train_fitness=0.9850 (gradient_boosting)
+  Model 1: profit_factor=0.5817
+  Model 2: profit_factor=0.9113
+  Model 3: profit_factor=1.0520
+  Model 4: profit_factor=0.9791
+  Model 5: profit_factor=0.9603
+Fold result: accuracy=0.7435, bets/month=1163.97, trades=803, sharpe=23.325
+
+Multi-fold combined (3 folds): accuracy=0.7536, bets/month=974.08, Sharpe=23.173, total_return=0.0740, trades=2016
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 3 top models for retraining
+  Retraining model 1/3 (random_forest)
+    Done
+  Retraining model 2/3 (random_forest)
+    Done
+  Retraining model 3/3 (gradient_boosting)
+    Done
+Training horizon ensemble for 5 horizons...
+  Horizon 1h (factor=4)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 1441 rows
+    Prepared 1420 samples with 39 features
+  Horizon 4h (factor=16)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 361 rows
+    Prepared 340 samples with 39 features
+  Horizon 8h (factor=32)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 181 rows
+    Prepared 160 samples with 39 features
+  Horizon 12h (factor=48)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 121 rows
+    Prepared 100 samples with 39 features
+  Horizon 24h (factor=96)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 61 rows
+Fitting horizon ensembles for 4 horizons
+  Horizon 1h (1/4): processing 1420 rows
+    Feature count: 31, training samples: 1420
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 1h
+  Horizon 4h (2/4): processing 340 rows
+    Feature count: 31, training samples: 340
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 4h
+  Horizon 8h (3/4): processing 160 rows
+    Feature count: 31, training samples: 160
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 8h
+  Horizon 12h (4/4): processing 100 rows
+    Feature count: 31, training samples: 100
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 12h
+All horizon ensembles fitted
+Horizon ensemble training complete
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_093540
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T09:35:40.585496",
+  "accuracy": 0.7536190142256061,
+  "bets_per_month": 974.0799999999999,
+  "sharpe": 23.173275974264914,
+  "max_drawdown": 0.006008496610169176,
+  "total_return": 0.07404763665283098,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.8576666666666667,
+    "1": 0.8576666666666667,
+    "2": 0.8486666666666667,
+    "3": 0.7923333333333333,
+    "4": 0.792
+  }
+}
+============================================================
+
+Step completed. Latest signal: -1
+Accuracy: 0.7536, Bets/month: 974.08

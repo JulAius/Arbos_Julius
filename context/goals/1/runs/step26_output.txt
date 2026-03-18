@@ -1,0 +1,189 @@
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Loaded 77450 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-17 18:15:00
+Online mode: limited data to last 90 days (8641 rows)
+[main] Starting feature preparation...
+Preparing features...
+  Generating horizon features...
+[horizon] Starting feature generation: 8641 rows, horizons=['15m', '1h', '4h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 31 features for horizon 15m...
+[horizon]   Merged (result now has 8641 rows, 32 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 2161 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (2161 rows)
+[horizon] Merging 31 features for horizon 1h...
+[horizon]   Merged (result now has 8641 rows, 63 cols)
+[horizon] Horizon 4h: resampling by factor 16...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 541 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 4h features prepared (541 rows)
+[horizon] Merging 31 features for horizon 4h...
+[horizon]   Merged (result now has 8641 rows, 94 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 8641 rows, 94 columns
+Prepared 8330 samples with 103 columns
+Feature count: 93
+[main] Feature preparation complete: 8330 rows, 93 features
+Limited training to 3000 most recent samples
+Evolving population (input_dim=93)...
+  Generation 1/1
+    Training individual 1/5 (random_forest)
+      -> fitness=0.7913
+    Training individual 2/5 (random_forest)
+      -> fitness=0.8387
+    Training individual 3/5 (random_forest)
+      -> fitness=0.8593
+    Training individual 4/5 (random_forest)
+      -> fitness=0.8680
+    Training individual 5/5 (random_forest)
+      -> fitness=0.8680
+    Best fitness: 0.8680 (model=random_forest)
+Using 5761 recent samples for walk-forward validation (max 60 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/2: train=1729, valid=2016
+    Gen 1: best_train_fitness=0.8612 (random_forest)
+  Model 1: profit_factor=1.1113
+  Model 2: profit_factor=1.0071
+  Model 3: profit_factor=1.1113
+  Model 4: profit_factor=0.9801
+  Model 5: profit_factor=1.0248
+
+Top 10 feature importances:
+  close_open_ratio_1h: 0.0715
+  mom_1_1h: 0.0542
+  mom_3: 0.0400
+  mom_5: 0.0378
+  bb_position: 0.0340
+  mom_1: 0.0339
+  close_open_ratio: 0.0327
+  rsi: 0.0283
+  mom_10: 0.0255
+  close_open_ratio_4h: 0.0216
+Fold result: accuracy=0.8765, bets/month=246.42, trades=170, sharpe=30.668
+
+Fold 2/2: train=3000, valid=2016
+    Gen 1: best_train_fitness=0.8780 (random_forest)
+  Model 1: profit_factor=0.9509
+  Model 2: profit_factor=1.0049
+  Model 3: profit_factor=1.0013
+  Model 4: profit_factor=0.9888
+  Model 5: profit_factor=1.0013
+
+Top 10 feature importances:
+  close_open_ratio_1h: 0.0734
+  mom_1_1h: 0.0614
+  mom_3: 0.0460
+  bb_position: 0.0335
+  mom_1: 0.0318
+  close_open_ratio: 0.0284
+  mom_5: 0.0278
+  mom_10: 0.0260
+  mom_3_1h: 0.0254
+  rsi: 0.0215
+Fold result: accuracy=0.8179, bets/month=421.81, trades=291, sharpe=34.583
+
+Multi-fold combined (2 folds): accuracy=0.8395, bets/month=334.12, Sharpe=32.626, total_return=0.0420, trades=461
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 2 top models for retraining
+  Retraining model 1/2 (random_forest)
+    Done
+  Retraining model 2/2 (random_forest)
+    Done
+Training horizon ensemble for 2 horizons...
+  Horizon 1h (factor=4)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 1441 rows
+    Prepared 1420 samples with 39 features
+  Horizon 4h (factor=16)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 361 rows
+    Prepared 340 samples with 39 features
+Fitting horizon ensembles for 2 horizons
+  Horizon 1h (1/2): processing 1420 rows
+    Feature count: 31, training samples: 1420
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 1h
+  Horizon 4h (2/2): processing 340 rows
+    Feature count: 31, training samples: 340
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 4h
+All horizon ensembles fitted
+Horizon ensemble training complete
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_092338
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T09:23:38.183955",
+  "accuracy": 0.8394793926247288,
+  "bets_per_month": 334.1152380952381,
+  "sharpe": 32.62567006805904,
+  "max_drawdown": 0.00042682209475832097,
+  "total_return": 0.041992828364130944,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.868,
+    "1": 0.868,
+    "2": 0.8593333333333333,
+    "3": 0.8386666666666667,
+    "4": 0.7913333333333333
+  }
+}
+============================================================
+STEP 26 RESULT:
+{
+  "timestamp": "2026-03-18T09:23:38.183955",
+  "accuracy": 0.8394793926247288,
+  "bets_per_month": 334.1152380952381,
+  "sharpe": 32.62567006805904,
+  "max_drawdown": 0.00042682209475832097,
+  "total_return": 0.041992828364130944,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.868,
+    "1": 0.868,
+    "2": 0.8593333333333333,
+    "3": 0.8386666666666667,
+    "4": 0.7913333333333333
+  }
+}

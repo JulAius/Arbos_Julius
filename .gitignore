@@ -39,8 +39,8 @@ logs/
 history/
 scratch/
 
-# Context (generated run data)
-context/
+# Context — tracked for persistence
+# context/
 
 # Codex
 .codex-pool/

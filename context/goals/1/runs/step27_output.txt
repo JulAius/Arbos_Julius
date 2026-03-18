@@ -1,0 +1,194 @@
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Loaded 77450 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-17 18:15:00
+Online mode: limited data to last 90 days (8641 rows)
+[main] Starting feature preparation...
+Preparing features...
+  Generating horizon features...
+[horizon] Starting feature generation: 8641 rows, horizons=['15m', '1h', '4h', '8h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 31 features for horizon 15m...
+[horizon]   Merged (result now has 8641 rows, 32 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 2161 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (2161 rows)
+[horizon] Merging 31 features for horizon 1h...
+[horizon]   Merged (result now has 8641 rows, 63 cols)
+[horizon] Horizon 4h: resampling by factor 16...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 541 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 4h features prepared (541 rows)
+[horizon] Merging 31 features for horizon 4h...
+[horizon]   Merged (result now has 8641 rows, 94 cols)
+[horizon] Horizon 8h: resampling by factor 32...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 271 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 8h features prepared (271 rows)
+[horizon] Merging 31 features for horizon 8h...
+[horizon]   Merged (result now has 8641 rows, 125 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 8641 rows, 125 columns
+Prepared 8010 samples with 134 columns
+Feature count: 124
+[main] Feature preparation complete: 8010 rows, 124 features
+Limited training to 3000 most recent samples
+Evolving population (input_dim=124)...
+  Generation 1/1
+    Training individual 1/5 (logistic)
+      -> fitness=0.6847
+    Training individual 2/5 (random_forest)
+      -> fitness=0.8730
+    Training individual 3/5 (random_forest)
+      -> fitness=0.8273
+    Training individual 4/5 (logistic)
+      -> fitness=0.7130
+    Training individual 5/5 (logistic)
+      -> fitness=0.6847
+    Best fitness: 0.8730 (model=random_forest)
+Using 5761 recent samples for walk-forward validation (max 60 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/2: train=1729, valid=2016
+    Gen 1: best_train_fitness=0.8433 (random_forest)
+  Model 1: profit_factor=1.1301
+  Model 2: profit_factor=0.9212
+  Model 3: profit_factor=0.9523
+  Model 4: profit_factor=0.7388
+  Model 5: profit_factor=0.6655
+Fold result: accuracy=0.7802, bets/month=1114.68, trades=769, sharpe=38.193
+
+Fold 2/2: train=3000, valid=2016
+    Gen 1: best_train_fitness=0.8213 (random_forest)
+  Model 1: profit_factor=0.9608
+  Model 2: profit_factor=0.9608
+  Model 3: profit_factor=1.0379
+  Model 4: profit_factor=1.0799
+  Model 5: profit_factor=1.1411
+Fold result: accuracy=0.8169, bets/month=1045.11, trades=721, sharpe=45.932
+
+Multi-fold combined (2 folds): accuracy=0.7980, bets/month=1079.90, Sharpe=42.063, total_return=0.1042, trades=1490
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 3 top models for retraining
+  Retraining model 1/3 (random_forest)
+    Done
+  Retraining model 2/3 (random_forest)
+    Done
+  Retraining model 3/3 (logistic)
+    Done
+Training horizon ensemble for 3 horizons...
+  Horizon 1h (factor=4)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 1441 rows
+    Prepared 1420 samples with 39 features
+  Horizon 4h (factor=16)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 361 rows
+    Prepared 340 samples with 39 features
+  Horizon 8h (factor=32)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 181 rows
+    Prepared 160 samples with 39 features
+Fitting horizon ensembles for 3 horizons
+  Horizon 1h (1/3): processing 1420 rows
+    Feature count: 31, training samples: 1420
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 1h
+  Horizon 4h (2/3): processing 340 rows
+    Feature count: 31, training samples: 340
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 4h
+  Horizon 8h (3/3): processing 160 rows
+    Feature count: 31, training samples: 160
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 8h
+All horizon ensembles fitted
+Horizon ensemble training complete
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_092717
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T09:27:17.459337",
+  "accuracy": 0.797986577181208,
+  "bets_per_month": 1079.8952380952383,
+  "sharpe": 42.06260213438393,
+  "max_drawdown": 0.0010165096669790435,
+  "total_return": 0.10415815121236319,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.873,
+    "1": 0.8273333333333334,
+    "2": 0.713,
+    "3": 0.6846666666666666,
+    "4": 0.6846666666666666
+  }
+}
+============================================================
+FINAL RESULT: {
+  "timestamp": "2026-03-18T09:27:17.459337",
+  "accuracy": 0.797986577181208,
+  "bets_per_month": 1079.8952380952383,
+  "sharpe": 42.06260213438393,
+  "max_drawdown": 0.0010165096669790435,
+  "total_return": 0.10415815121236319,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.873,
+    "1": 0.8273333333333334,
+    "2": 0.713,
+    "3": 0.6846666666666666,
+    "4": 0.6846666666666666
+  }
+}

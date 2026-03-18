@@ -1,0 +1,12 @@
+{
+  "1": {
+    "summary": "sota btc Trading model",
+    "delay": 0,
+    "started": true,
+    "paused": false,
+    "step_count": 40,
+    "goal_hash": "1759876b2353077b",
+    "last_run": "2026-03-18T11:23:35.350596",
+    "last_finished": "2026-03-18T11:01:58.496118"
+  }
+}

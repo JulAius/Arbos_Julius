@@ -1,0 +1,298 @@
+[main] main() started
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Loaded 77450 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-17 18:15:00
+Online mode: limited data to last 120 days (11521 rows)
+[main] Starting feature preparation...
+Preparing features...
+  Generating horizon features...
+[horizon] Starting feature generation: 11521 rows, horizons=['15m', '1h', '4h', '8h', '12h', '24h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 31 features for horizon 15m...
+[horizon]   Merged (result now has 11521 rows, 32 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 2881 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (2881 rows)
+[horizon] Merging 31 features for horizon 1h...
+[horizon]   Merged (result now has 11521 rows, 63 cols)
+[horizon] Horizon 4h: resampling by factor 16...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 721 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 4h features prepared (721 rows)
+[horizon] Merging 31 features for horizon 4h...
+[horizon]   Merged (result now has 11521 rows, 94 cols)
+[horizon] Horizon 8h: resampling by factor 32...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 361 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 8h features prepared (361 rows)
+[horizon] Merging 31 features for horizon 8h...
+[horizon]   Merged (result now has 11521 rows, 125 cols)
+[horizon] Horizon 12h: resampling by factor 48...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 241 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 12h features prepared (241 rows)
+[horizon] Merging 31 features for horizon 12h...
+[horizon]   Merged (result now has 11521 rows, 156 cols)
+[horizon] Horizon 24h: resampling by factor 96...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 121 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 24h features prepared (121 rows)
+[horizon] Merging 31 features for horizon 24h...
+[horizon]   Merged (result now has 11521 rows, 187 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 11521 rows, 187 columns
+Prepared 9674 samples with 196 columns
+Feature count: 186
+[main] Feature preparation complete: 9674 rows, 186 features
+Limited training to 3000 most recent samples
+Evolving population (input_dim=186)...
+  Generation 1/1
+    Training individual 1/5 (extra_trees)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+      -> fitness=0.7730
+    Training individual 2/5 (extra_trees)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+      -> fitness=0.7630
+    Training individual 3/5 (gradient_boosting)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+      -> fitness=0.7583
+    Training individual 4/5 (random_forest)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+      -> fitness=0.7873
+    Training individual 5/5 (extra_trees)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+      -> fitness=0.7730
+    Best fitness: 0.7873 (model=random_forest)
+Using 8641 recent samples for walk-forward validation (max 90 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/3: train=2593, valid=2016
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Gen 1: best_train_fitness=0.8141 (random_forest)
+  Model 1: profit_factor=0.7179
+  Model 2: profit_factor=0.6676
+  Model 3: profit_factor=0.6131
+  Model 4: profit_factor=0.5668
+  Model 5: profit_factor=0.6192
+Fold result: accuracy=0.7611, bets/month=982.78, trades=678, sharpe=14.055
+
+Fold 2/3: train=3000, valid=2016
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Gen 1: best_train_fitness=0.7760 (random_forest)
+  Model 1: profit_factor=0.9475
+  Model 2: profit_factor=1.1246
+  Model 3: profit_factor=0.9242
+  Model 4: profit_factor=1.0083
+  Model 5: profit_factor=1.1754
+Fold result: accuracy=0.8029, bets/month=1007.42, trades=695, sharpe=38.848
+
+Fold 3/3: train=3000, valid=2016
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Gen 1: best_train_fitness=0.8097 (random_forest)
+  Model 1: profit_factor=1.0624
+  Model 2: profit_factor=0.9415
+  Model 3: profit_factor=1.0363
+  Model 4: profit_factor=0.8925
+  Model 5: profit_factor=1.0932
+Fold result: accuracy=0.7485, bets/month=1423.43, trades=982, sharpe=27.905
+
+Multi-fold combined (3 folds): accuracy=0.7682, bets/month=1137.88, Sharpe=26.936, total_return=0.0907, trades=2355
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 3 top models for retraining
+  Retraining model 1/3 (random_forest)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Done
+  Retraining model 2/3 (extra_trees)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Done
+  Retraining model 3/3 (gradient_boosting)
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+    Done
+Training horizon ensemble for 5 horizons...
+  Horizon 1h (factor=4)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 1441 rows
+    Prepared 1420 samples with 39 features
+  Horizon 4h (factor=16)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 361 rows
+    Prepared 340 samples with 39 features
+  Horizon 8h (factor=32)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 181 rows
+    Prepared 160 samples with 39 features
+  Horizon 12h (factor=48)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 121 rows
+    Prepared 100 samples with 39 features
+  Horizon 24h (factor=96)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 61 rows
+Fitting horizon ensembles for 4 horizons
+  Horizon 1h (1/4): processing 1420 rows
+    Feature count: 31, training samples: 1420
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 5 trained
+    Completed horizon 1h
+  Horizon 4h (2/4): processing 340 rows
+    Feature count: 31, training samples: 340
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+/home/julien/projects/Bittensor/Arbos/.venv/lib/python3.10/site-packages/sklearn/calibration.py:330: FutureWarning: The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8. You can use CalibratedClassifierCV(FrozenEstimator(estimator)) instead.
+  warnings.warn(
+[horizon]   Model 5 trained
+    Completed horizon 4h
+  Horizon 8h (3/4): processing 160 rows
+    Feature count: 31, training samples: 160
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 8h
+  Horizon 12h (4/4): processing 100 rows
+    Feature count: 31, training samples: 100
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 12h
+All horizon ensembles fitted
+Horizon ensemble training complete
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_094758
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T09:47:58.306834",
+  "accuracy": 0.7681528662420383,
+  "bets_per_month": 1137.8761904761905,
+  "sharpe": 26.93612689567279,
+  "max_drawdown": 0.0037132268755280446,
+  "total_return": 0.09070604553825978,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.7873333333333333,
+    "1": 0.773,
+    "2": 0.773,
+    "3": 0.763,
+    "4": 0.7583333333333333
+  }
+}
+============================================================
+
+Step completed. Latest signal: -1
+Accuracy: 0.7682, Bets/month: 1137.88
