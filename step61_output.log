@@ -1,0 +1,191 @@
+[main] main() started
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Loaded 77450 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-17 18:15:00
+Online mode: limited data to last 180 days (17281 rows)
+[main] Starting feature preparation...
+Preparing features...
+  Generating horizon features...
+[horizon] Starting feature generation: 17281 rows, horizons=['15m', '30m', '1h', '2h', '4h', '8h', '12h', '24h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 60 features for horizon 15m...
+[horizon]   Merged (result now has 17281 rows, 61 cols)
+[horizon] Horizon 30m: resampling by factor 2...
+[horizon]   Resampled to 8641 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 30m features prepared (8641 rows)
+[horizon] Merging 60 features for horizon 30m...
+[horizon]   Merged (result now has 17281 rows, 121 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+[horizon]   Resampled to 4321 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (4321 rows)
+[horizon] Merging 60 features for horizon 1h...
+[horizon]   Merged (result now has 17281 rows, 181 cols)
+[horizon] Horizon 2h: resampling by factor 8...
+[horizon]   Resampled to 2161 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 2h features prepared (2161 rows)
+[horizon] Merging 60 features for horizon 2h...
+[horizon]   Merged (result now has 17281 rows, 241 cols)
+[horizon] Horizon 4h: resampling by factor 16...
+[horizon]   Resampled to 1081 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 4h features prepared (1081 rows)
+[horizon] Merging 60 features for horizon 4h...
+[horizon]   Merged (result now has 17281 rows, 301 cols)
+[horizon] Horizon 8h: resampling by factor 32...
+[horizon]   Resampled to 541 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 8h features prepared (541 rows)
+[horizon] Merging 60 features for horizon 8h...
+[horizon]   Merged (result now has 17281 rows, 361 cols)
+[horizon] Horizon 12h: resampling by factor 48...
+[horizon]   Resampled to 361 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 12h features prepared (361 rows)
+[horizon] Merging 60 features for horizon 12h...
+[horizon]   Merged (result now has 17281 rows, 421 cols)
+[horizon] Horizon 24h: resampling by factor 96...
+[horizon]   Resampled to 181 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 24h features prepared (181 rows)
+[horizon] Merging 60 features for horizon 24h...
+[horizon]   Merged (result now has 17281 rows, 481 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 17281 rows, 485 columns
+Prepared 15434 samples with 494 columns
+Feature count: 484
+[main] Feature preparation complete: 15434 rows, 484 features
+Limited training to 6000 most recent samples
+Evolving population (input_dim=484)...
+  Generation 1/1
+    Training individual 1/5 (lightgbm)
+      -> fitness=0.9740
+    Training individual 2/5 (lightgbm)
+      -> fitness=0.8257
+    Training individual 3/5 (lightgbm)
+      -> fitness=0.9468
+    Training individual 4/5 (lightgbm)
+      -> fitness=0.9732
+    Training individual 5/5 (lightgbm)
+      -> fitness=0.9737
+    Best fitness: 0.9740 (model=lightgbm)
+Using 11521 recent samples for walk-forward validation (max 120 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/3: train=5473, valid=2016
+    Gen 1: best_train_fitness=0.9744 (lightgbm)
+  Model 1: profit_factor=1.2096
+  Model 2: profit_factor=1.2382
+  Model 3: profit_factor=1.1301
+  Model 4: profit_factor=1.1183
+  Model 5: profit_factor=1.1235
+
+Top 10 feature importances:
+  vwap_dist_10: 359.0000
+  vwap_dist_5_30m: 295.0000
+  stoch_k_5: 245.0000
+  mom_1: 239.0000
+  stoch_k_14: 180.0000
+  lower_wick_ratio_30m: 179.0000
+  mom_1_30m: 177.0000
+  stoch_k_5_30m: 176.0000
+  upper_wick_ratio_30m: 166.0000
+  bb_position: 157.0000
+Fold result: accuracy=0.9029, bets/month=1656.81, trades=1143, sharpe=41.687
+
+Fold 2/3: train=6000, valid=2016
+    Gen 1: best_train_fitness=0.9770 (lightgbm)
+  Model 1: profit_factor=1.4418
+  Model 2: profit_factor=1.5825
+  Model 3: profit_factor=1.5748
+  Model 4: profit_factor=1.5380
+  Model 5: profit_factor=1.4618
+
+Top 10 feature importances:
+  vwap_dist_5_30m: 182.0000
+  vwap_dist_10: 174.0000
+  stoch_k_5: 96.0000
+  stoch_k_14: 91.0000
+  mom_1: 86.0000
+  vwap_dist_20: 79.0000
+  stoch_k_5_30m: 74.0000
+  mom_1_30m: 70.0000
+  vwap_dist_10_30m: 70.0000
+  candle_streak: 68.0000
+Fold result: accuracy=0.8848, bets/month=1633.61, trades=1127, sharpe=55.346
+
+Fold 3/3: train=6000, valid=2016
+    Gen 1: best_train_fitness=0.9757 (lightgbm)
+  Model 1: profit_factor=1.4529
+  Model 2: profit_factor=1.4281
+  Model 3: profit_factor=1.4599
+  Model 4: profit_factor=1.3547
+  Model 5: profit_factor=1.4244
+
+Top 10 feature importances:
+  stoch_k_14: 579.0000
+  rsi_roc_1: 574.0000
+  vwap_dist_10: 551.0000
+  price_accel: 525.0000
+  upper_wick_ratio: 523.0000
+  body_ratio: 499.0000
+  mom_1: 481.0000
+  lower_wick_ratio: 461.0000
+  stoch_k_5: 437.0000
+  trades_count_ratio: 419.0000
+Fold result: accuracy=0.8783, bets/month=1703.19, trades=1175, sharpe=55.779
+
+Multi-fold combined (3 folds): accuracy=0.8886, bets/month=1664.54, Sharpe=50.937, total_return=0.1772, trades=3445
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 4 top models for retraining
+  Retraining model 1/4 (lightgbm)
+    Done
+  Retraining model 2/4 (lightgbm)
+    Done
+  Retraining model 3/4 (lightgbm)
+    Done
+  Retraining model 4/4 (lightgbm)
+    Done
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_125940
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T12:59:40.605412",
+  "accuracy": 0.8885675611689261,
+  "bets_per_month": 1664.536507936508,
+  "sharpe": 50.93740826596015,
+  "max_drawdown": 0.0023209262974594456,
+  "total_return": 0.17723340803855991,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 0.974,
+    "1": 0.9736666666666667,
+    "2": 0.9731666666666666,
+    "3": 0.9468333333333333,
+    "4": 0.8256666666666667
+  }
+}
+============================================================
+[main] Feature selection: saved top 300 features (from 484 total)
+
+Step completed. Latest signal: -1
+Accuracy: 0.8886, Bets/month: 1664.54
