@@ -29,7 +29,7 @@ When the Anthropic quota is exceeded, Arbos automatically switches to the config
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with Pro auth (`claude login`)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code): `curl -fsSL https://claude.ai/install.sh | bash` — then `claude login` (Pro auth)
 - [Telegram Bot token](https://core.telegram.org/bots#how-do-i-create-a-bot)
 - Fallback: [OpenRouter API key](https://openrouter.ai) or [OpenCode CLI](https://opencode.ai) (`curl -fsSL https://opencode.ai/install | bash`) + API key
 - Python 3.10+, `pm2`
@@ -37,6 +37,12 @@ When the Anthropic quota is exceeded, Arbos automatically switches to the config
 ## Getting started
 
 ```sh
+# Install Claude Code CLI (required)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Install OpenCode CLI (optional, for FALLBACK_PROVIDER=opencode)
+curl -fsSL https://opencode.ai/install | bash
+
 git clone https://github.com/JulAius/arbos_genesis.git
 cd arbos_genesis
 cp .env.example .env
