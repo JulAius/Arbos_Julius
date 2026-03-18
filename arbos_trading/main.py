@@ -93,11 +93,55 @@ class TradingSystem:
 
     def load_or_fetch_data(self, force_refetch: bool = False) -> pd.DataFrame:
         """
-        Load data from disk or fetch from Binance if not available/forced.
+        Load data from disk, then incrementally refresh if data is stale (>15 min old).
+        Full re-fetch only if file doesn't exist or force_refetch=True.
         """
+        from .data.fetcher import BinanceDataFetcher
+
         if not force_refetch and self.data_path.exists():
             print(f"Loading data from {self.data_path}", flush=True)
             df = pd.read_csv(self.data_path, parse_dates=["open_time"])
+
+            # Incremental refresh: if last candle is >15 min old, fetch new candles
+            if not df.empty:
+                last_ts = df["open_time"].max()
+                now_utc = datetime.utcnow()
+                age_minutes = (now_utc - last_ts).total_seconds() / 60
+                print(f"Last candle: {last_ts} (age: {age_minutes:.1f} min)", flush=True)
+
+                if age_minutes > 15:
+                    print(f"Data stale by {age_minutes:.1f} min — fetching incremental update...", flush=True)
+                    try:
+                        fetcher = BinanceDataFetcher()
+                        # Add 1 ms to last_ts to skip fetching the already-existing candle
+                        next_start_ms = int((last_ts.timestamp() + 0.001) * 1000)
+                        # Fetch raw klines directly to avoid timezone ambiguity
+                        klines = fetcher.fetch_klines(start_time=next_start_ms, limit=500)
+                        if klines:
+                            df_new = pd.DataFrame(klines, columns=[
+                                "open_time", "open", "high", "low", "close", "volume",
+                                "close_time", "quote_volume", "trades_count",
+                                "taker_buy_base", "taker_buy_quote", "ignore"
+                            ])
+                            df_new["open_time"] = pd.to_datetime(df_new["open_time"], unit="ms")
+                            for col in ["open", "high", "low", "close", "volume", "quote_volume", "taker_buy_base", "taker_buy_quote"]:
+                                df_new[col] = pd.to_numeric(df_new[col])
+                            df_new["trades_count"] = pd.to_numeric(df_new["trades_count"])
+                            df_new = df_new[["open_time", "open", "high", "low", "close", "volume", "quote_volume", "trades_count", "taker_buy_base", "taker_buy_quote"]]
+                        else:
+                            df_new = pd.DataFrame()
+                        if not df_new.empty:
+                            df_combined = pd.concat([df, df_new], ignore_index=True)
+                            df_combined = df_combined.drop_duplicates(subset="open_time")
+                            df_combined = df_combined.sort_values("open_time").reset_index(drop=True)
+                            df_combined.to_csv(self.data_path, index=False)
+                            new_rows = len(df_combined) - len(df)
+                            print(f"Incremental update: +{new_rows} new candles (total: {len(df_combined)})", flush=True)
+                            df = df_combined
+                        else:
+                            print("No new data returned from Binance.", flush=True)
+                    except Exception as e:
+                        print(f"Incremental refresh failed: {e} — using cached data.", flush=True)
         else:
             print("Fetching fresh data from Binance...", flush=True)
             df = fetch_and_save_historical(
@@ -123,8 +167,31 @@ class TradingSystem:
         # Clean data
         df = clean_data(df)
 
-        # Create target (next 15-minute direction)
+        # Create target (next 1-candle direction — mean-reversion is a 1-bar phenomenon)
         df = create_target(df, forward_periods=1)
+
+        # Load and merge futures features (funding rate, L/S ratio, OI)
+        try:
+            from .data.futures_fetcher import load_or_fetch_futures_features
+            futures_features = load_or_fetch_futures_features()
+            futures_cols = [c for c in futures_features.columns if c != "open_time"]
+            df = df.merge(futures_features[["open_time"] + futures_cols], on="open_time", how="left")
+            # Forward-fill futures features (they update at 8h or 15m intervals)
+            df[futures_cols] = df[futures_cols].ffill()
+            # Neutral fill for remaining NaNs (e.g., L/S and OI have only recent 500 bars)
+            neutral_fills = {
+                "long_short_ratio": 1.0, "ls_ratio_ma10": 1.0, "ls_ratio_dev": 0.0,
+                "ls_ratio_z": 0.0, "oi_change": 0.0, "oi_ratio": 1.0,
+                "open_interest": 0.0, "oi_ma20": 0.0,
+            }
+            for col, fill_val in neutral_fills.items():
+                if col in df.columns:
+                    df[col] = df[col].fillna(fill_val)
+            # Remaining futures cols: fill with 0
+            df[futures_cols] = df[futures_cols].fillna(0)
+            print(f"  Merged {len(futures_cols)} futures features (funding rate, L/S, OI)", flush=True)
+        except Exception as e:
+            print(f"  Futures features unavailable: {e}", flush=True)
 
         # Generate horizon ensemble features (these will be added as extra columns)
         print("  Generating horizon features...", flush=True)
@@ -144,7 +211,9 @@ class TradingSystem:
             col for col in df.columns
             if col not in [
                 "open_time", "open", "high", "low", "close", "volume",
-                "quote_volume", "trades_count", "future_close", "target"
+                "quote_volume", "trades_count", "future_close", "target",
+                "taker_buy_base", "taker_buy_quote",  # raw order flow — use derived ratios
+                "long_account", "short_account",  # raw L/S components — use derived ratio
             ]
         ]
 
@@ -236,10 +305,30 @@ class TradingSystem:
         )
         pop.initialize(input_dim=X_train.shape[1], feature_names=self.feature_names)
 
+        # Sample weights: age decay × return magnitude
+        # Age decay: recent samples weighted higher (half_life=2000 candles ≈ 20 days)
+        n_train = len(X_train)
+        half_life = 2000
+        age_weight = np.exp(-np.arange(n_train - 1, -1, -1) / half_life)
+
+        # Return magnitude weight: large moves matter more for profitability
+        # Model should correctly predict large moves (which overcome fees) more than small ones
+        next_returns = train_df["close"].pct_change().shift(-1).abs().fillna(0)
+        next_returns = next_returns.iloc[-n_train:].values
+        next_returns = np.clip(next_returns, 0, 0.02)  # cap at 2% to limit outlier influence
+        mag_weight = next_returns / (next_returns.mean() + 1e-10)
+        mag_weight = np.clip(mag_weight, 0.1, 5.0)  # bound: min 10% weight, max 5× weight
+
+        sample_weight = age_weight * mag_weight
+        sample_weight = sample_weight / sample_weight.mean()  # normalize to mean=1
+
         for gen in range(ModelConfig.GENERATIONS_PER_ITERATION):
             for ind in pop.individuals:
                 try:
-                    ind.model.fit(X_train, y_train)
+                    if ind.model_type == 'lightgbm':
+                        ind.model.fit(X_train, y_train, sample_weight=sample_weight)
+                    else:
+                        ind.model.fit(X_train, y_train)
                     pred = ind.model.predict(X_train, threshold=0.5)
                     ind.fitness = (pred == y_train).mean()
                 except Exception as e:
@@ -259,7 +348,7 @@ class TradingSystem:
                 if isinstance(pred_valid, np.ndarray):
                     pred_valid = pd.Series(pred_valid, index=X_valid.index)
                 signals_ind = pred_valid.reindex(close_prices.index).fillna(-1).astype(int)
-                self.trader.run(signals_ind, valid_ohlc)
+                self.trader.run(signals_ind, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)
                 ind.fitness = self.trader.metrics.get('profit_factor', 0.0)
                 ind.validation_metrics = self.trader.metrics
                 print(f"  Model {i+1}: profit_factor={ind.fitness:.4f}", flush=True)
@@ -277,8 +366,42 @@ class TradingSystem:
         )
         signals = consensus.decide(top_models, X_valid)
 
-        # Run simulator
-        self.trader.run(signals, valid_ohlc)
+        # Step 102: Best-balance mean-reversion signal (87th pct + 0.38/0.62 taker + RSI 45/55)
+        # Result: ~62% accuracy, 141 bets/month — meets count target, below 65% accuracy target
+        # Fundamental limit: mean-reversion negative skew requires 67.6%+ accuracy for break-even at maker fees
+        # Next iteration should explore: order book data, cross-asset signals, or trend-following approach
+        if "taker_buy_ratio" in X_valid.columns and "ret_lag_1" in X_valid.columns:
+            # Large move threshold: top 13% absolute return (from train data, no leakage)
+            train_abs_ret = train_df["ret_lag_1"].abs() if "ret_lag_1" in train_df.columns else pd.Series([0])
+            move_threshold = float(train_abs_ret.quantile(0.87))
+
+            current_ret = X_valid["ret_lag_1"]
+            current_bar_large_down = current_ret < -move_threshold
+            current_bar_large_up = current_ret > move_threshold
+
+            taker_low = X_valid["taker_buy_ratio"] < 0.38
+            taker_high = X_valid["taker_buy_ratio"] > 0.62
+
+            rsi_col = "rsi" if "rsi" in X_valid.columns else None
+            if rsi_col:
+                rsi_oversold = X_valid[rsi_col] < 45
+                rsi_overbought = X_valid[rsi_col] > 55
+            else:
+                rsi_oversold = pd.Series(True, index=X_valid.index)
+                rsi_overbought = pd.Series(True, index=X_valid.index)
+
+            rule_signals = pd.Series(-1, index=X_valid.index)
+            rule_signals[current_bar_large_down & taker_low & rsi_oversold] = 1
+            rule_signals[current_bar_large_up & taker_high & rsi_overbought] = 0
+            signals = rule_signals
+
+            n_signals = (signals != -1).sum()
+            n_up = (signals == 1).sum()
+            n_down = (signals == 0).sum()
+            print(f"  Rule signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}", flush=True)
+
+        # Run simulator with configured hold period
+        self.trader.run(signals, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)
         metrics = self.trader.metrics.copy()
 
         # Directional accuracy

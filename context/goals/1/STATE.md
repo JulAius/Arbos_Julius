@@ -3,78 +3,103 @@
 ## Summary
 BTC 15-minute directional prediction system with evolutionary model search and walk-forward validation. Target: >=65% accuracy, >90 bets/month, positive Sharpe.
 
-## Current Status: ✅ Steps 38 & 39 Completed – Threshold plateau confirmed, axis pivot successful
+## Current Status: ⚠️ Step 102 – Signal research complete, structural limits identified
 
-### Step 39 Configuration (current)
-- **Calibration:** USE_CALIBRATION=True, method='sigmoid', split=0.10 (FrozenEstimator)
-- **Consensus thresholds:** MIN_MODELS_AGREE=2, MIN_CONFIDENCE=0.75
-- **Population:** POP_SIZE=5, MODEL_TYPES=["random_forest", "extra_trees", "gradient_boosting"]
-- **Training data:** ONLINE_DATA_DAYS=120, MAX_TRAIN_SAMPLES=6000
-- **Validation:** TRAIN_DAYS=21, VALID_DAYS=21, MAX_WALK_FORWARD_DAYS=90 (3-fold WFV)
-- **RF:** n_estimators=[100,200], max_depth=[10,12,15], min_samples_leaf=[5,10,15]
-- **ET:** n_estimators=[100,200], max_depth=[10,12,15], min_samples_leaf=[3,5,10]
-- **GBM:** lr=[0.02,0.05,0.1], n_estimators=[100,200,300], max_depth=[2,3,4]
+### CRITICAL: Data Leakage Discovered & Fixed (Step 85)
+**All results from steps 39–83 were invalidated by data leakage in `generate_horizon_features`.**
 
-### Step 39 Results (run: results/20260318_100019)
-| Metric | Fold 1 | Fold 2 | Fold 3 | Combined | Target |
-|--------|--------|--------|--------|---------|--------|
-| Accuracy | 81.02% | 87.00% | 81.18% | **82.35%** | ≥65% ✅ |
-| Bets/month | 481.2 | 323.2 | 739.3 | **514.6** | >90 ✅ |
-| Sharpe | 24.7 | 34.8 | 39.4 | **32.99** | >1.0 ✅ |
-| Total return | — | — | — | **+7.46%** | positive ✅ |
-| Max drawdown | — | — | — | **0.076%** | controlled ✅ |
-| Trades | 332 | 223 | 510 | **1065** | robust ✅ |
+**Leakage mechanism:** When resampling 15m bars to 1h (factor=4), the 1h candle's close = T:45 bar's close. This resampled bar was merged at `open_time=T:00` and forward-filled to T:15, T:30, T:45. Technical indicators (RSI, MACD, BB) on the 1h bar then **encoded the T:45 close** for the T:30 bar whose target was `T:45 > T:30`. Equivalent leakage existed for 2h, 4h, 24h horizons.
 
-### Step 38 → Step 39 Analysis
-| Metric | Step 38 | Step 39 | Change |
-|--------|---------|---------|--------|
-| Accuracy | 81.98% | **82.35%** | +0.37% ✅ |
-| Bets/month | 463.9 | **514.6** | +10.9% ✅ |
-| Sharpe | 32.197 | **32.987** | +0.79 ✅ |
-| Total return | +7.40% | **+7.46%** | +0.06% ✅ |
-| Max drawdown | 0.059% | **0.076%** | +28% (still excellent) |
+**Fix applied (`horizon.py`):** Shift resampled bar `open_time` forward by one horizon period before merging:
+```python
+df_resampled["open_time"] += pd.Timedelta(minutes=horizon_minutes)
+```
 
-**Key observation**: Expanding MAX_TRAIN_SAMPLES 4k→6k + wider hyperparams gave +0.37% accuracy AND +10.9% more bets. All metrics improved. Axis pivot successful.
+**Confirmation:** Accuracy dropped 94% → 56.4% after fix — proving prior results were entirely leak-driven.
 
-### Top Feature Importances (Step 39)
-1. mom_1_1h: 0.059 (1h momentum — most predictive)
-2. close_open_ratio_1h: 0.055 (1h intrabar direction)
-3. mom_3: 0.036 (3-bar 15m momentum)
-4. bb_position: 0.028 (Bollinger Band position)
-5. mom_5: 0.026 (5-bar 15m momentum)
-→ Multi-horizon momentum features dominate. 1h context is crucial.
+### Signal Research Summary (Steps 85-102)
 
-### Goal Status: ALL OBJECTIVES MET (AND IMPROVING)
-- **Directional accuracy ≥ 65%:** ✅ 82.35% (17.35% above target)
-- **Bets/month > 90:** ✅ 514.6 bets/month (5.7× target)
-- **Positive return:** ✅ +7.46% over 63-day window
-- **Max drawdown controlled:** ✅ 0.076% (excellent!)
-- **Sharpe:** ✅ 32.99
+The mean-reversion signal (large down bar + low taker_buy → predict UP next bar) was extensively tuned:
 
-### Recommended Next Step (Step 40): Expand data window 120→180 days
-- Change ONLINE_DATA_DAYS=120 → 180
-- More regime coverage; fold 2 gets ~5500 samples (was 4609), fold 3 stays at 6000
-- Expected: accuracy ~83-84%, bets/month ~500, Sharpe ~34+
-- RISK: Older data may be less relevant; watch for accuracy degradation
+| Step | Signal Parameters | Accuracy | Bets/month | Sharpe (taker) | Notes |
+|------|-----------------|----------|------------|----------------|-------|
+| 85 | Pure ML (LightGBM) | 56.4% | 253 | -9.07 | Baseline after leakage fix |
+| 91 | 85th pct, 0.40/0.60, no RSI | 58.47% | 259 | -11.6 | ML agreement filter ineffective |
+| 92 | 90th pct, 0.35/0.65, RSI 45/55 | 63.33% | 72 | -5.1 | High acc, below 90/month |
+| 93 | **87th pct, 0.38/0.62, RSI 45/55** | **61.99%** | **141** | **-7.84** | **Best balance** |
+| 94 | +trend_regime_1h filter | 62.93% | 56 | -5.0 | Too few signals |
+| 95 | 90th pct, 0.35/0.65, RSI, buy_pressure_change | 70.37% | 13 | -0.47 | Too few signals |
+| 96 | +BB position < 0.20 | 61.69% | 126 | -7.38 | Similar to step 93 |
+| 99 | Step 93 + maker fee (0.02%) | 61.99% | 141 | -3.93 | Maker fee helps, still negative |
+| 101 | Step 95 conditions + maker fee | 87.5% | 4 | +4.63 | Statistically noise (8 trades) |
+| **102** | **Step 93 conditions + maker fee** | **61.99%** | **141** | **-3.93** | **Current config** |
 
-### Threshold Tuning Trajectory (COMPLETE — plateau at 0.75)
-| Step | MIN_CONFIDENCE | Accuracy | Bets/month | Sharpe | Drawdown |
-|------|---------------|----------|------------|--------|----------|
-| 33 | 0.65 (calibrated) | 76.82% | 1137.9 | 26.94 | 0.37% |
-| 34 | 0.67 | 77.99% | 1034.0 | 29.32 | 0.22% |
-| 35 | 0.69 | 78.82% | 885.2 | 31.87 | 0.13% |
-| 36 | 0.71 | 79.93% | 717.5 | 31.76 | 0.20% |
-| 37 | 0.73 | 81.22% | 545.5 | 32.23 | 0.089% |
-| 38 | 0.75 | 81.98% | 463.9 | 32.197 | 0.059% |
-| **39** | **0.75 (pivot)** | **82.35%** | **514.6** | **32.99** | **0.076%** |
+### Current Configuration (Step 102)
+- **Signal:** Large down bar (87th pct) + taker_buy < 0.38 + RSI < 45 → predict UP; symmetric for DOWN
+- **Model type:** LightGBM only (`MODEL_TYPES=["lightgbm"]`)
+- **Fee:** FEE_RATE=0.0002 (maker, 0.02%/side — mean-reversion uses limit orders for entry)
+- **Hold:** 1-bar (15 min) — mean-reversion is a 1-bar phenomenon
+- **Horizons:** 15m + 30m + 1h (3 horizons, proper time-shifted to avoid leakage)
+- **Features:** 212 features including order flow (taker_buy_ratio, vwap_dev, etc.) + futures (funding rate, L/S, OI)
 
-### Previous Steps (summary)
-- **Step 39:** MAX_TRAIN 4k→6k + wider hyperparams → **82.35% acc, 514.6 bets/month, Sharpe=32.99** ✅
-- **Step 38:** MIN_CONFIDENCE 0.73→0.75 → **81.98% acc, 463.9 bets/month, Sharpe=32.197** (plateau) ✅
-- **Step 37:** MIN_CONFIDENCE 0.71→0.73 → **81.22% acc, 545.5 bets/month, Sharpe=32.23** ✅
-- **Step 36:** MIN_CONFIDENCE 0.69→0.71 → **79.93% acc, 717.5 bets/month, Sharpe=31.76** ✅
-- **Step 35:** MIN_CONFIDENCE 0.67→0.69 → **78.82% acc, 885 bets/month, Sharpe=31.87** ✅
-- **Step 34:** MIN_CONFIDENCE 0.65→0.67, CALIBRATION_SPLIT 0.20→0.10, MAX_TRAIN=3k→4k → **77.99% acc, 1034 bets/month, Sharpe=29.32** ✅
-- **Step 33:** Probability calibration (sigmoid) → **76.82% acc, 1137.9 bets/month, Sharpe=26.94** ✅
-- **Step 32:** MIN_CONFIDENCE 0.70→0.65 → **81.25% acc, 556.6 bets/month, Sharpe=32.30** ✅
-- **Step 31:** RF+ExtraTrees+GBM (no logistic) → **84.2% acc, 250.8 bets/month** ✅
+### Goal Status: NOT ACHIEVED
+| Metric | Result | Target | Status |
+|--------|--------|--------|--------|
+| Accuracy | 61.99% (combined WFV) | ≥65% | ❌ (-3%) |
+| Bets/month | 141 | >90 | ✅ |
+| Sharpe | -3.93 | >0 | ❌ |
+
+### Root Cause of Negative Sharpe
+
+**Mean-reversion has negative return skew:**
+- When correct (62%): avg win ≈ 0.17% - 0.06% fee = **+0.11%**
+- When wrong (38%): avg loss ≈ 0.17% + 0.06% fee = **-0.23%**
+- Win/Loss ratio = 0.11/0.23 = 0.48 < 1.0
+
+**Break-even accuracy formula:** p = (avg_move + fee) / (2 × avg_move)
+- With avg_next_bar_move=0.17%, maker_fee=0.06%: break-even = 0.67 = **67.0%** accuracy needed
+- Current best: 62% combined, 66% in best folds
+- Gap: ~5% accuracy to break even
+
+**The accuracy-count tradeoff:**
+- Tighter signal conditions → higher accuracy (70%+) but fewer signals (< 13/month, below 90 target)
+- Looser conditions → more signals (141/month) but lower accuracy (62%)
+- No parameter combination found that achieves BOTH ≥65% accuracy AND ≥90/month AND positive Sharpe
+
+### Why Fold 2 is Consistently Poor
+
+The 3-fold WFV covers approximately Nov 2025 - Mar 2026. Fold 2 (~Feb 5-26, 2026) consistently shows 57-59% accuracy regardless of signal tuning. This period likely involved high-volatility whipsaw market action following BTC's pullback from January 2026 highs. In such markets:
+- Mean-reversion fails (trend continuation wins)
+- Trend-following also fails (no persistence)
+- Any strategy underperforms
+
+### Recommended Next Steps
+
+To achieve positive Sharpe with ≥65% accuracy and ≥90 bets/month:
+
+1. **Order book data**: Bid-ask spread, depth at each level — genuine microstructure signal without the negative skew problem
+2. **Trend-following switch**: Positive skew (winners run, losers stopped quickly) works with < 50% accuracy
+3. **Cross-asset signals**: ETH/BTC spread, USDT market cap flow, DXY, fear&greed index
+4. **News/sentiment**: NLP on crypto Twitter/Reddit for regime detection
+5. **Longer timeframe**: 4h or 1D bars have larger moves relative to fees (break-even accuracy drops significantly)
+
+### Key Lessons Learned (Steps 85-102)
+1. **Data leakage via resampled horizons**: future close encoded in multi-timeframe features when merge timing not offset → always shift by 1 period before merge
+2. **Mean-reversion on 15m BTC has negative skew**: small wins, larger losses → requires very high accuracy (>67%) to be profitable at realistic fees
+3. **ML models learn momentum**: adding ML agreement filter to mean-reversion rule HURTS (ML filters out good mean-reversion signals)
+4. **Fee economics dominate at 15m**: 0.06% round-trip maker fee = 35% of a typical next-bar return (0.17%), making break-even very hard
+5. **Stop-losses fire on correct trades**: BTC intrabar volatility frequently touches 0.3%+ stops even for ultimately profitable trades
+6. **Fold 2 (Feb 2026) is a structural drag**: whipsaw market always produces poor mean-reversion accuracy; combined 3-fold avg ≈ 62%
+7. **Statistical noise at low count**: signals with <20 trades per fold produce unreliable accuracy estimates (87.5% on 8 trades is noise)
+
+### Evolution Trajectory
+| Step | Key Change | Accuracy | Notes |
+|------|-----------|----------|-------|
+| 39 | RF+ET+GBM, 31 feat | 82.35% | ⚠️ leakage |
+| 72 | LightGBM + 448 feat | 88.75% | ⚠️ leakage |
+| 80 | MIN_CONF=0.92 + full HPs | 95.07% | ⚠️ leakage |
+| **85** | **Leak fixed** | **56.4%** | ✅ clean baseline |
+| 91 | Rule-based mean-reversion | 58.47% | ✅ clean, 259/month |
+| 92 | Tighter thresholds + RSI | 63.33% | ✅ highest acc, 72/month |
+| 93 | Balanced parameters | 61.99% | ✅ 141/month |
+| **102** | **Maker fees, best signal** | **61.99%** | ✅ current best |

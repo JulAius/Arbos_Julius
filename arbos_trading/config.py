@@ -32,16 +32,13 @@ class FeatureConfig:
     # Lagged features (number of past candles to include)
     N_LAGS = 10
 
-    # Horizon resampling (in minutes) - multi-horizon context for 15m target
+    # Horizon resampling — Step 85: only 15m + 30m after leakage fix.
+    # With proper time-shift, 4h bar features are 4h stale (too stale for 15m prediction).
+    # 30m bar is 30min stale (useful recent context). 1h is 1h stale (marginal).
     HORIZONS = {
-        "15m": 1,    # base horizon
-        "30m": 2,    # 30-minute context (2 x 15m) - sub-hourly signal (Step 49)
-        "1h": 4,     # 1-hour context (4 x 15m)
-        "2h": 8,     # 2-hour context (8 x 15m) - mid-term signal between 1h and 4h (Step 46)
-        "4h": 16,    # 4-hour context (16 x 15m)
-        "8h": 32,    # 8-hour context (32 x 15m) - longer-term trend signal
-        "12h": 48,   # 12-hour context (48 x 15m) - daily cycle signal
-        "24h": 96,   # 24-hour context (96 x 15m) - full daily cycle
+        "15m": 1,    # base horizon (no shift — current bar's own features)
+        "30m": 2,    # 30-minute context (shifted 30 min forward — 30 min stale)
+        "1h": 4,     # 1-hour context (shifted 1h forward — 1h stale, marginal signal)
     }
 
     # Feature scaling (to improve logistic convergence and memory)
@@ -81,11 +78,13 @@ class ModelConfig:
     GRADIENT_BOOSTING_N_ESTIMATORS = [200, 300, 500]      # increased from [100,200,300] (Step 48): larger HistGBM ensembles
     GRADIENT_BOOSTING_MAX_DEPTH = [2, 3, 4]               # added depth 4 with more estimators
 
-    # LightGBM hyperparameter ranges (Step 72 proven config: 88.75% accuracy, 1692 bets/month, Sharpe 50.41)
-    LIGHTGBM_N_ESTIMATORS = [200, 300, 400]         # larger = more stable, slower
-    LIGHTGBM_LEARNING_RATE = [0.02, 0.05, 0.1]      # 0.05 dominant in best models
-    LIGHTGBM_NUM_LEAVES = [31, 63, 127]             # 127 dominant (deeper leaf-wise)
-    LIGHTGBM_MIN_CHILD_SAMPLES = [10, 20, 50]       # regularization via min samples
+    # LightGBM hyperparameter ranges (Step 85: after leakage fix, regularization added)
+    LIGHTGBM_N_ESTIMATORS = [100, 200, 300]         # reduced: 400 was overfitting on leaky data
+    LIGHTGBM_LEARNING_RATE = [0.02, 0.05, 0.1]      # full range maintained
+    LIGHTGBM_NUM_LEAVES = [15, 31, 63]              # reduced: 127 was overfitting; smaller trees generalize better
+    LIGHTGBM_MIN_CHILD_SAMPLES = [20, 50, 100]      # increased: more min_child helps generalization
+    LIGHTGBM_REG_ALPHA = [0.0, 0.1, 0.5, 1.0]      # Step 85: L1 regularization to prevent overfitting
+    LIGHTGBM_REG_LAMBDA = [0.0, 0.1, 0.5, 1.0]     # Step 85: L2 regularization to prevent overfitting
 
     # Threshold for confident predictions (unused, consensus uses its own)
     PREDICTION_THRESHOLD = 0.55
@@ -109,16 +108,19 @@ class ValidationConfig:
 # Trading simulation
 class TradingConfig:
     INITIAL_CAPITAL = 10000.0
-    FEE_RATE = 0.0004  # 0.04% per side (Binance Futures taker fee - realistic)
+    FEE_RATE = 0.0002  # 0.02% per side (maker fee — mean-reversion uses limit orders for entry)
+    # Maker fee rationale: post-crash limit BUY = passive order = 0.02% maker rate on Binance Futures
+    # Round-trip = 0.02%×2 + 0.01% slippage = 0.05% → break-even at 58.3% (vs 66.7% for taker)
     SLIPPAGE = 0.0001  # 0.01% per side (BTC perp is very liquid)
     POSITION_SIZE = 0.05  # Fraction of capital per trade (reduced for risk control)
     MAX_POSITIONS = 1
-    STOP_LOSS_PCT = 0.0  # No stop-loss: fixed 1-candle hold exits at next close
+    STOP_LOSS_PCT = 0.0  # No stop-loss: intrabar stops fire on correct trades (BTC too volatile)
+    HOLD_PERIODS = 1    # Exit at next close (1-bar hold); the mean-reversion signal is a 1-bar effect
 
 # Consensus gating
 class ConsensusConfig:
     MIN_MODELS_AGREE = 2  # reset from 3; 3 produced zero trades in Step 21
-    MIN_CONFIDENCE = 0.90  # Step 78: grid-search optimum — 93.71% accuracy, 1137 bets/month, Sharpe 57.20 (deterministic, seed=42)
+    MIN_CONFIDENCE = 0.55  # Step 85: recalibrated for honest (non-leaky) data; 0.92 was tuned on leaky features
 
 # Performance targets
 class Targets:

@@ -35,16 +35,18 @@ class SimulatedTrader:
         self,
         signals: pd.Series,
         prices,
-        entry_price_col: str = "close"
+        entry_price_col: str = "close",
+        n_hold: int = 1
     ) -> Dict[str, float]:
         """
-        Run simulation with fixed 1-period holding, optional stop-loss.
+        Run simulation with N-period holding, optional stop-loss.
 
         Args:
             signals: Series of signals (1=long, 0=short, -1=no trade)
             prices: Either a Series of close prices, or a DataFrame with columns ['close','high','low'].
                     If DataFrame provided and stop_loss_pct > 0, stop-loss will be tested against the high/low of the next period.
             entry_price_col: ignored (we use close)
+            n_hold: number of periods to hold (default 1). With n_hold=4, holds for 1h on 15m data.
 
         Returns:
             dict of performance metrics
@@ -78,13 +80,14 @@ class SimulatedTrader:
         equity = pd.Series(index=signals.index, dtype=float)
         equity.iloc[0] = capital
 
-        # Iterate through each timestamp, use signal to open a trade that closes at next timestamp
-        for i in range(len(signals) - 1):
+        # Iterate through each timestamp, use signal to open a trade that closes at i+n_hold
+        for i in range(len(signals) - n_hold):
             sig = signals.iloc[i]
             current_price = close_series.iloc[i]
-            next_close = close_series.iloc[i+1]
-            next_high = high_series.iloc[i+1]
-            next_low = low_series.iloc[i+1]
+            exit_idx = min(i + n_hold, len(close_series) - 1)
+            next_close = close_series.iloc[exit_idx]
+            next_high = high_series.iloc[exit_idx]
+            next_low = low_series.iloc[exit_idx]
 
             if sig == -1:
                 # No trade, carry forward capital
