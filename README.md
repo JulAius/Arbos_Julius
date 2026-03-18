@@ -88,6 +88,7 @@ TELEGRAM_OWNER_ID=...           # your Telegram user ID
 AUTO_PUSH=true                  # auto-push profitable changes
 PUSH_MIN_ACCURACY=0.60          # minimum accuracy to push
 PUSH_MIN_SHARPE=0               # minimum Sharpe to push
+GITHUB_TOKEN=ghp_...            # GitHub token for auto-push
 ```
 
 ## Auto-push
