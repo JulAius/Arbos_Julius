@@ -1,67 +1,92 @@
 # Arbos
 
-![Arbos](arbos.jpg)
-
 <p align="center">
-  Welcome! Arbos is simply a <a href="https://ghuntley.com/loop/">Ralph-loop</a> combined with a Telegram bot.<br>
-  That's all you need to do just about anything.
+  Arbos is a <a href="https://ghuntley.com/loop/">Ralph-loop</a> combined with a Telegram bot.<br>
+  It loops a goal through Claude Code, powered by Anthropic with an OpenRouter fallback.
 </p>
 
-# The Design
+## The Design
 
-Arbos just loops a `GOAL.md` through a coding agent. 
+Arbos loops a `GOAL.md` through a coding agent, step after step, with no memory between steps except `STATE.md`.
+
 ```
-                                     ┌────── [GOAL.md] ────────┐
-                                     ▼                         │
-                ┌──────────┐     ┌───────┐                     │
-                │ Telegram │◄───►│ Agent │─────────────────────┘
-                └──────────┘     └───────┘
+                                 ┌────── [GOAL.md] ────────┐
+                                 ▼                         │
+            ┌──────────┐     ┌───────┐                     │
+            │ Telegram │◄───►│ Agent │─────────────────────┘
+            └──────────┘     └───────┘
 ```
+
+## Providers
+
+| Priority | Provider | Model | Auth |
+|----------|----------|-------|------|
+| Primary | **Anthropic** | `claude-sonnet-4-6` | Claude Code Pro (OAuth) |
+| Fallback | **OpenRouter** | `stepfun/step-3.5-flash:free` | API key |
+
+When the Anthropic quota is exceeded, Arbos automatically switches to the OpenRouter free model. At each new step, it retries Anthropic first.
 
 ## Requirements
 
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with Pro auth (`claude login`)
 - [Telegram Bot token](https://core.telegram.org/bots#how-do-i-create-a-bot)
-- [Chutes API key](https://chutes.ai)
+- [OpenRouter API key](https://openrouter.ai) (for fallback)
+- Python 3.10+, `pm2`
 
 ## Getting started
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/unconst/Arbos/main/run.sh | bash
+git clone https://github.com/JulAius/arbos_genesis.git
+cd arbos_genesis
+cp .env.exemple .env
+# Edit .env with your tokens
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r <(grep -oP '"\K[^"]+' pyproject.toml | head -20) 2>/dev/null || pip install requests httpx uvicorn fastapi pyTelegramBotAPI python-dotenv cryptography
+pm2 start .arbos-launch.sh --name arbos
 ```
 
 ## Usage
 
-To run Arbos just set the `/goal`:
+Send `/goal` to your Telegram bot:
+
 ```
 /goal
-
-Use the below program to evolve a system S that discovers profitable trading strategies.
-
-You are given:
-C = { Hyperliquid capital, Coinglass derivatives data (funding, OI, liquidations, leverage), compute on Basilica/Targon/Lium }
-
-Initial state (build first)
-S₀ = online continuous adaptive trading system which:
-    - uses online data for training
-    - uses evolutionary model search (mutate/replace weak models)
-    - uses strict walk-forward validation + online Sharpe filtering
-    - uses horizon ensembles H = {1h,4h,8h,12h,24h}
-    - uses consensus gating for signals
-    - uses time-series foundation models
-
-Run this loop continously
-loop t = 1..∞
-    S_t = design_or_modify(S_{t-1})  # implement current design S
-    O_t = run(S_t)                   # run S: i.e. train, evaluate, trade
-    P_t = measure(O_t)               # eval: Sharpe, PnL, drawdown, regime behavior
-    Δ_t = reflect(S_t, P_t)          # find weaknesses in your design 
-    S_{t+1} = improve(S_t, Δ_t)      # design a new design.
-end
+Build a trading system that predicts BTC direction on a 15-minute horizon.
 ```
 
-Then iterate.
+### Telegram commands
+
+| Command | Description |
+|---------|-------------|
+| `/goal <text>` | Set the goal for a slot |
+| `/status` | Show current goals and step counts |
+| `/pause` / `/resume` | Pause/resume a goal |
+| `/restart` | Restart the process via pm2 |
+| `/update` | Git pull and restart |
+| `/clear` | Reset context and state |
+
+## How it works
+
+1. Each **step** is a single `claude -p` invocation with full tool access
+2. Steps run back-to-back on success, with exponential backoff on failure
+3. `STATE.md` is the only memory between steps — if it's not written there, it's forgotten
+4. The Telegram bot relays operator messages and streams agent responses
+5. SIGINT/SIGTERM are handled gracefully — no crash restarts
+
+## Configuration
+
+See `.env.exemple` for all options:
+
+```env
+PROVIDER=anthropic              # primary provider
+CLAUDE_MODEL=claude-sonnet-4-6  # primary model
+FALLBACK_PROVIDER=openrouter    # fallback on quota exceeded
+FALLBACK_MODEL=stepfun/step-3.5-flash:free
+OPENROUTER_API_KEY=sk-or-...    # fallback API key
+TAU_BOT_TOKEN=...               # Telegram bot token
+TELEGRAM_OWNER_ID=...           # your Telegram user ID
+```
 
 ---
 
-MIT 
-
+MIT
