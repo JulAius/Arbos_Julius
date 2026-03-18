@@ -1202,7 +1202,8 @@ def _start_proxy():
 
 _QUOTA_PATTERNS = re.compile(
     r"rate.limit|rate_limit|429|quota|credit|billing|overloaded|"
-    r"exceeded.*limit|too many requests|insufficient|capacity",
+    r"exceeded.*limit|too many requests|insufficient|capacity|"
+    r"hit.*limit|resets \d",
     re.IGNORECASE,
 )
 
@@ -1448,9 +1449,12 @@ def run_agent(cmd: list[str], phase: str, output_file: Path,
             output_file.write_text(_redact_secrets("".join(raw_lines)))
             _log(f"{phase}: finished rc={returncode} {fmt_duration(elapsed)}")
 
-            if returncode != 0 and stderr_output.strip():
-                _log(f"{phase}: stderr {stderr_output.strip()[:300]}")
-                if _is_quota_error(stderr_output) and not _using_fallback:
+            combined_err = f"{stderr_output} {result_text}"
+            if returncode != 0 and (stderr_output.strip() or _is_quota_error(combined_err)):
+                if stderr_output.strip():
+                    _log(f"{phase}: stderr {stderr_output.strip()[:300]}")
+                if _is_quota_error(combined_err) and not _using_fallback:
+                    _log(f"{phase}: quota/rate-limit detected, switching to fallback")
                     _switch_to_fallback()
                     continue
                 if attempt < MAX_RETRIES:
