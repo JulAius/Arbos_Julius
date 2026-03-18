@@ -1,0 +1,29 @@
+[
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 15
+    },
+    "fitness": 0.7936666666666666
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 6,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.769
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 30,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.8136666666666666
+  }
+]

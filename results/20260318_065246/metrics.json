@@ -1,0 +1,11 @@
+{
+  "accuracy": 0.0,
+  "bets_per_month": 0.0,
+  "sharpe": 0.0,
+  "max_drawdown": 0.0,
+  "total_return": 0.0,
+  "n_trades": 0,
+  "profit_factor": 0.0,
+  "final_equity": 10000.0,
+  "n_folds": 1
+}

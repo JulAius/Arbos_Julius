@@ -1,0 +1,46 @@
+[
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.77
+  },
+  {
+    "model_type": "logistic",
+    "params": {
+      "C": 100.0,
+      "max_iter": 5000
+    },
+    "fitness": 0.5385
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.77
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.77
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.77
+  }
+]

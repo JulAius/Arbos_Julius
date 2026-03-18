@@ -1,0 +1,82 @@
+[
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 15
+    },
+    "fitness": 0.9870666666666666
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 15
+    },
+    "fitness": 0.9870666666666666
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 15
+    },
+    "fitness": 0.9870666666666666
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 75,
+      "max_depth": 12
+    },
+    "fitness": 0.0
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 10
+    },
+    "fitness": 0.8575333333333334
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 15
+    },
+    "fitness": 0.0
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 10
+    },
+    "fitness": 0.0
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 10
+    },
+    "fitness": 0.8575333333333334
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 15
+    },
+    "fitness": 0.0
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 15
+    },
+    "fitness": 0.0
+  }
+]

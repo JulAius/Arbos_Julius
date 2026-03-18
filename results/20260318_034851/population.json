@@ -1,0 +1,27 @@
+[
+  {
+    "model_type": "logistic",
+    "params": {
+      "C": 0.01,
+      "max_iter": 5000
+    },
+    "fitness": 0.682
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 10,
+      "min_samples_leaf": 5
+    },
+    "fitness": 0.907
+  },
+  {
+    "model_type": "logistic",
+    "params": {
+      "C": 100.0,
+      "max_iter": 5000
+    },
+    "fitness": 0.6995
+  }
+]

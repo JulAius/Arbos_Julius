@@ -1,0 +1,42 @@
+[
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 20
+    },
+    "fitness": 0.9988162422573985
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 20
+    },
+    "fitness": 0.9988162422573985
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 20
+    },
+    "fitness": 0.9988162422573985
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100.0,
+      "max_depth": 20.0
+    },
+    "fitness": 0.0
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 20
+    },
+    "fitness": 0.9988162422573985
+  }
+]

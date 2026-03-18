@@ -1,0 +1,47 @@
+[
+  {
+    "model_type": "extra_trees",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 10,
+      "min_samples_leaf": 5
+    },
+    "fitness": 0.74175
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 50,
+      "max_depth": 8,
+      "min_samples_leaf": 15
+    },
+    "fitness": 0.759
+  },
+  {
+    "model_type": "extra_trees",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 8,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.642
+  },
+  {
+    "model_type": "random_forest",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 10,
+      "min_samples_leaf": 10
+    },
+    "fitness": 0.81125
+  },
+  {
+    "model_type": "extra_trees",
+    "params": {
+      "n_estimators": 100,
+      "max_depth": 8,
+      "min_samples_leaf": 5
+    },
+    "fitness": 0.6775
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.8,
+  "bets_per_month": 21.742857142857144,
+  "sharpe": -2.4249326421924415,
+  "max_drawdown": 0.0015302182168596661,
+  "total_return": -0.0005655337587406393,
+  "n_trades": 5,
+  "profit_factor": 0.6449000801232239,
+  "final_equity": 9994.344662412594,
+  "gross_profit": 0.005123975358069854,
+  "gross_loss": 0.00794537859663591,
+  "n_folds": 1
+}
