@@ -1550,6 +1550,14 @@ def run_agent(cmd: list[str], phase: str, output_file: Path,
                 env = os.environ.copy()
                 env.pop("TAU_BOT_TOKEN", None)
                 env["PYTHONUNBUFFERED"] = "1"
+                # Inject OpenCode config from .env (no opencode.json needed)
+                opencode_config = {
+                    "model": f"opencode/{FALLBACK_MODEL}",
+                    "small_model": f"opencode/{FALLBACK_MODEL}",
+                    "autoupdate": os.environ.get("OPENCODE_AUTOUPDATE", "false").lower() == "true",
+                    "snapshot": os.environ.get("OPENCODE_SNAPSHOT", "false").lower() == "true",
+                }
+                env["OPENCODE_CONFIG_CONTENT"] = json.dumps(opencode_config)
                 engine = "opencode"
             else:
                 prompt_text = ""

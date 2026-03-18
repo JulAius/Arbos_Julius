@@ -93,7 +93,7 @@ FALLBACK_PROVIDER=openrouter
 FALLBACK_MODEL=stepfun/step-3.5-flash:free
 OPENROUTER_API_KEY=sk-or-...    # required for openrouter fallback
 
-# Fallback B: OpenCode (OpenCode CLI + MiniMax)
+# Fallback B: OpenCode (config from .env — opencode.json optional)
 FALLBACK_PROVIDER=opencode
 FALLBACK_MODEL=minimax-m2.5-free
 OPENCODE_API_KEY=...             # required for opencode fallback
