@@ -1203,7 +1203,8 @@ def _start_proxy():
 _QUOTA_PATTERNS = re.compile(
     r"rate.limit|rate_limit|429|quota|credit|billing|overloaded|"
     r"exceeded.*limit|too many requests|insufficient|capacity|"
-    r"hit.*limit|resets \d",
+    r"hit.*limit|resets \d|"
+    r"not logged in|authentication_failed|please run /login",
     re.IGNORECASE,
 )
 
@@ -1219,7 +1220,8 @@ def _switch_to_fallback():
             return
         _using_fallback = True
     _log(f"quota exceeded — switching to fallback: {FALLBACK_PROVIDER}/{FALLBACK_MODEL}")
-    _write_claude_settings()
+    if FALLBACK_PROVIDER != "opencode":
+        _write_claude_settings()
 
 
 def _try_primary():
@@ -1428,6 +1430,109 @@ def _run_claude_once(cmd, env, on_text=None, on_activity=None):
     return returncode, result_text, raw_lines, stderr_output
 
 
+# ── OpenCode runner ──────────────────────────────────────────────────────────
+
+def _opencode_cmd(model: str | None = None) -> list[str]:
+    m = model or (FALLBACK_MODEL if _using_fallback else CLAUDE_MODEL)
+    cmd = ["opencode", "run", "--format", "json"]
+    if m:
+        cmd.extend(["-m", f"opencode/{m}"])
+    return cmd
+
+
+def _run_opencode_once(cmd, env, on_text=None, on_activity=None, prompt: str = ""):
+    """Run a single opencode subprocess, return (returncode, result_text, raw_lines, stderr).
+
+    Parses OpenCode's JSON stream format: step_start, text, tool_use, step_finish.
+    The prompt is sent via stdin (opencode reads from pipe).
+    """
+    proc = subprocess.Popen(
+        cmd, cwd=WORKING_DIR, env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, bufsize=1,
+    )
+    with _child_procs_lock:
+        _child_procs.add(proc)
+
+    if proc.stdin and prompt:
+        try:
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except OSError:
+            pass
+
+    result_text = ""
+    complete_texts: list[str] = []
+    raw_lines: list[str] = []
+    timed_out = False
+    last_activity = time.monotonic()
+
+    sel = selectors.DefaultSelector()
+    sel.register(proc.stdout, selectors.EVENT_READ)
+
+    try:
+        while True:
+            ready = sel.select(timeout=min(CLAUDE_TIMEOUT, 30))
+            if not ready:
+                if time.monotonic() - last_activity > CLAUDE_TIMEOUT:
+                    _log(f"opencode timeout: no output for {CLAUDE_TIMEOUT}s, killing pid={proc.pid}")
+                    proc.kill()
+                    timed_out = True
+                    break
+                if proc.poll() is not None:
+                    break
+                continue
+            line = proc.stdout.readline()
+            if not line:
+                break
+            last_activity = time.monotonic()
+            raw_lines.append(line)
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            etype = evt.get("type", "")
+            part = evt.get("part", {})
+
+            if etype == "text":
+                text = part.get("text", "")
+                if text:
+                    complete_texts.append(text)
+                    if on_text:
+                        on_text(text)
+
+            elif etype == "tool_use":
+                tool = part.get("tool", "")
+                state = part.get("state", {})
+                if on_activity and state.get("status") == "completed":
+                    inp = state.get("input", {})
+                    desc = inp.get("command", "") or inp.get("path", "") or str(inp)[:80]
+                    on_activity(f"{tool}: {desc[:80]}")
+
+            elif etype == "step_finish":
+                tokens = part.get("tokens", {})
+                with _token_lock:
+                    _token_usage["input"] += tokens.get("input", 0)
+                    _token_usage["output"] += tokens.get("output", 0)
+
+    finally:
+        sel.unregister(proc.stdout)
+        sel.close()
+
+    result_text = "\n\n".join(complete_texts) if complete_texts else ""
+
+    if timed_out:
+        stderr_output = "(timed out)"
+    else:
+        stderr_output = proc.stderr.read() if proc.stderr else ""
+
+    returncode = proc.wait()
+    with _child_procs_lock:
+        _child_procs.discard(proc)
+    return returncode, result_text, raw_lines, stderr_output
+
+
 def run_agent(cmd: list[str], phase: str, output_file: Path,
               on_text=None, on_activity=None, goal_index: int = 0) -> subprocess.CompletedProcess:
     _claude_semaphore.acquire()
@@ -1437,13 +1542,32 @@ def run_agent(cmd: list[str], phase: str, output_file: Path,
         returncode, result_text, raw_lines, stderr_output = 1, "", [], "no attempts made"
 
         for attempt in range(1, MAX_RETRIES + 1):
-            env = _claude_env(goal_index=goal_index)
-            _log(f"{phase}: starting (attempt={attempt}) flags=[{flags}]")
+            use_opencode = _using_fallback and FALLBACK_PROVIDER == "opencode"
+
+            if use_opencode:
+                prompt_text = cmd[cmd.index("-p") + 1] if "-p" in cmd else ""
+                active_cmd = _opencode_cmd()
+                env = os.environ.copy()
+                env.pop("TAU_BOT_TOKEN", None)
+                env["PYTHONUNBUFFERED"] = "1"
+                engine = "opencode"
+            else:
+                prompt_text = ""
+                active_cmd = cmd
+                env = _claude_env(goal_index=goal_index)
+                engine = "claude"
+
+            _log(f"{phase}: starting (attempt={attempt}, engine={engine}) flags=[{flags}]")
             t0 = time.monotonic()
 
-            returncode, result_text, raw_lines, stderr_output = _run_claude_once(
-                cmd, env, on_text=on_text, on_activity=on_activity,
-            )
+            if use_opencode:
+                returncode, result_text, raw_lines, stderr_output = _run_opencode_once(
+                    active_cmd, env, on_text=on_text, on_activity=on_activity, prompt=prompt_text,
+                )
+            else:
+                returncode, result_text, raw_lines, stderr_output = _run_claude_once(
+                    active_cmd, env, on_text=on_text, on_activity=on_activity,
+                )
             elapsed = time.monotonic() - t0
 
             output_file.write_text(_redact_secrets("".join(raw_lines)))
@@ -1788,9 +1912,17 @@ def _summarize_goal(text: str) -> str:
     """Generate a one-line summary of a goal via LLM. Falls back to truncation."""
     try:
         if PROVIDER == "anthropic":
-            url = f"{FALLBACK_BASE_URL}/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {FALLBACK_API_KEY}", "Content-Type": "application/json"}
-            model = FALLBACK_MODEL
+            or_key = os.environ.get("OPENROUTER_API_KEY", "")
+            if FALLBACK_PROVIDER == "opencode" and or_key:
+                url = "https://openrouter.ai/api/v1/chat/completions"
+                headers = {"Authorization": f"Bearer {or_key}", "Content-Type": "application/json"}
+                model = "stepfun/step-3.5-flash:free"
+            elif FALLBACK_BASE_URL and FALLBACK_API_KEY:
+                url = f"{FALLBACK_BASE_URL}/v1/chat/completions"
+                headers = {"Authorization": f"Bearer {FALLBACK_API_KEY}", "Content-Type": "application/json"}
+                model = FALLBACK_MODEL
+            else:
+                raise RuntimeError("no API endpoint for summarization")
         elif PROVIDER == "openrouter":
             url = f"{LLM_BASE_URL}/v1/chat/completions"
             headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
@@ -2721,7 +2853,9 @@ def main() -> None:
     _log(f"loaded {len(_goals)} goal(s) from goals.json")
 
     if PROVIDER == "anthropic":
-        if not FALLBACK_API_KEY:
+        if FALLBACK_PROVIDER == "opencode":
+            _log(f"fallback configured: opencode/{FALLBACK_MODEL}")
+        elif not FALLBACK_API_KEY:
             _log(f"WARNING: OPENROUTER_API_KEY not set — fallback will not work")
     elif not LLM_API_KEY:
         key_name = "OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "CHUTES_API_KEY"
