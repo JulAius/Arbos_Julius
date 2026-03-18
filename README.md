@@ -75,7 +75,7 @@ Build a trading system that predicts BTC direction on a 15-minute horizon.
 
 ## Configuration
 
-See `.env.exemple` for all options:
+See `.env.example` for all options:
 
 ```env
 PROVIDER=anthropic              # primary provider
@@ -85,7 +85,21 @@ FALLBACK_MODEL=stepfun/step-3.5-flash:free
 OPENROUTER_API_KEY=sk-or-...    # fallback API key
 TAU_BOT_TOKEN=...               # Telegram bot token
 TELEGRAM_OWNER_ID=...           # your Telegram user ID
+AUTO_PUSH=true                  # auto-push profitable changes
+PUSH_MIN_ACCURACY=0.60          # minimum accuracy to push
+PUSH_MIN_SHARPE=0               # minimum Sharpe to push
 ```
+
+## Auto-push
+
+When `AUTO_PUSH=true`, Arbos automatically commits and pushes code changes to GitHub after each successful step — **only if** the latest results meet profitability thresholds:
+
+- `accuracy >= PUSH_MIN_ACCURACY` (default 0.60)
+- `sharpe >= PUSH_MIN_SHARPE` (default 0)
+
+The agent can also force a push by creating a `.autopush` file (with an optional commit message inside).
+
+Excluded from auto-push: `.env`, `context/`, `logs/`.
 
 ---
 
