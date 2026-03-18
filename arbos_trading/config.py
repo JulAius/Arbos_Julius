@@ -61,7 +61,7 @@ class ModelConfig:
     MODEL_TYPES = ["lightgbm"]
 
     # Training sample limit (use most recent N samples to control memory/time)
-    MAX_TRAIN_SAMPLES = 6000  # reverted to 6000 (Step 45): 8000 hurt accuracy - optimal window ~62 days
+    MAX_TRAIN_SAMPLES = 5000  # reduced from 6000 (Step 76): bias toward recent data to improve fold-1 regime calibration
 
     # Hyperparameter ranges (expanded Step 39: deeper RF/ET, more GBM estimators)
     RANDOM_FOREST_N_ESTIMATORS = [200, 300]        # increased from [100,200] (Step 47): larger ensembles → more stable predictions
@@ -118,7 +118,7 @@ class TradingConfig:
 # Consensus gating
 class ConsensusConfig:
     MIN_MODELS_AGREE = 2  # reset from 3; 3 produced zero trades in Step 21
-    MIN_CONFIDENCE = 0.75  # raised from 0.73 (Step 38): final threshold test; expect ~82% accuracy, ~420 bets/month, Sharpe ~33+
+    MIN_CONFIDENCE = 0.77  # raised from 0.75 (Step 76): filter low-confidence trades in fold-1 regime to close 83%→90% accuracy gap
 
 # Performance targets
 class Targets:
