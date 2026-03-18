@@ -38,7 +38,7 @@ When the Anthropic quota is exceeded, Arbos automatically switches to the OpenRo
 ```sh
 git clone https://github.com/JulAius/arbos_genesis.git
 cd arbos_genesis
-cp .env.exemple .env
+cp .env.example .env
 # Edit .env with your tokens
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r <(grep -oP '"\K[^"]+' pyproject.toml | head -20) 2>/dev/null || pip install requests httpx uvicorn fastapi pyTelegramBotAPI python-dotenv cryptography
