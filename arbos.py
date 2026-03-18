@@ -223,7 +223,15 @@ PROXY_PORT = int(os.environ.get("PROXY_PORT", "8089"))
 PROXY_TIMEOUT = int(os.environ.get("PROXY_TIMEOUT", "600"))
 CHUTES_API_KEY = os.environ.get("CHUTES_API_KEY", "")
 
-if PROVIDER == "openrouter":
+if PROVIDER == "anthropic":
+    CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+    LLM_API_KEY = ""
+    LLM_BASE_URL = ""
+    COST_PER_M_INPUT = float(os.environ.get("COST_PER_M_INPUT", "3.00"))
+    COST_PER_M_OUTPUT = float(os.environ.get("COST_PER_M_OUTPUT", "15.00"))
+    CHUTES_ROUTING_AGENT = CLAUDE_MODEL
+    CHUTES_ROUTING_BOT = CLAUDE_MODEL
+elif PROVIDER == "openrouter":
     CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "stepfun/step-3.5-flash:free")
     LLM_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
     LLM_BASE_URL = "https://openrouter.ai/api"
@@ -247,6 +255,15 @@ else:
 IS_ROOT = os.getuid() == 0
 MAX_RETRIES = int(os.environ.get("CLAUDE_MAX_RETRIES", "5"))
 CLAUDE_TIMEOUT = int(os.environ.get("CLAUDE_TIMEOUT", "3600"))
+
+FALLBACK_PROVIDER = os.environ.get("FALLBACK_PROVIDER", "openrouter")
+FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "stepfun/step-3.5-flash:free")
+FALLBACK_API_KEY = os.environ.get("OPENROUTER_API_KEY", "") if FALLBACK_PROVIDER == "openrouter" else os.environ.get("FALLBACK_API_KEY", "")
+FALLBACK_BASE_URL = "https://openrouter.ai/api" if FALLBACK_PROVIDER == "openrouter" else os.environ.get("FALLBACK_BASE_URL", "")
+
+_provider_lock = threading.Lock()
+_using_fallback = False
+
 _tls = threading.local()
 _log_lock = threading.Lock()
 _chatlog_lock = threading.Lock()
@@ -1176,6 +1193,39 @@ def _start_proxy():
     server.run()
 
 
+# ── Provider failover ────────────────────────────────────────────────────────
+
+_QUOTA_PATTERNS = re.compile(
+    r"rate.limit|rate_limit|429|quota|credit|billing|overloaded|"
+    r"exceeded.*limit|too many requests|insufficient|capacity",
+    re.IGNORECASE,
+)
+
+
+def _is_quota_error(stderr_output: str) -> bool:
+    return bool(_QUOTA_PATTERNS.search(stderr_output))
+
+
+def _switch_to_fallback():
+    global _using_fallback
+    with _provider_lock:
+        if _using_fallback:
+            return
+        _using_fallback = True
+    _log(f"quota exceeded — switching to fallback: {FALLBACK_PROVIDER}/{FALLBACK_MODEL}")
+    _write_claude_settings()
+
+
+def _try_primary():
+    global _using_fallback
+    with _provider_lock:
+        if not _using_fallback:
+            return
+        _using_fallback = False
+    _log(f"trying primary provider: {PROVIDER}/{CLAUDE_MODEL}")
+    _write_claude_settings()
+
+
 # ── Agent runner ─────────────────────────────────────────────────────────────
 
 def _claude_cmd(prompt: str, extra_flags: list[str] | None = None) -> list[str]:
@@ -1189,18 +1239,26 @@ def _claude_cmd(prompt: str, extra_flags: list[str] | None = None) -> list[str]:
 
 
 def _write_claude_settings():
-    """Point Claude Code at the active provider (OpenRouter direct or Chutes proxy)."""
+    """Point Claude Code at the active provider."""
     settings_dir = WORKING_DIR / ".claude"
     settings_dir.mkdir(exist_ok=True)
 
-    if PROVIDER == "openrouter":
+    provider = FALLBACK_PROVIDER if _using_fallback else PROVIDER
+    model = FALLBACK_MODEL if _using_fallback else CLAUDE_MODEL
+
+    if provider == "anthropic":
+        env_block = {}
+        target_label = "pro-auth (native)"
+    elif provider == "openrouter":
+        api_key = FALLBACK_API_KEY if _using_fallback else LLM_API_KEY
+        base_url = FALLBACK_BASE_URL if _using_fallback else LLM_BASE_URL
         env_block = {
             "ANTHROPIC_API_KEY": "",
-            "ANTHROPIC_BASE_URL": LLM_BASE_URL,
-            "ANTHROPIC_AUTH_TOKEN": LLM_API_KEY,
+            "ANTHROPIC_BASE_URL": base_url,
+            "ANTHROPIC_AUTH_TOKEN": api_key,
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
         }
-        target_label = LLM_BASE_URL
+        target_label = base_url
     else:
         proxy_url = f"http://127.0.0.1:{PROXY_PORT}"
         env_block = {
@@ -1212,7 +1270,7 @@ def _write_claude_settings():
         target_label = proxy_url
 
     settings = {
-        "model": CLAUDE_MODEL,
+        "model": model,
         "permissions": {
             "allow": [
                 "Agent(*)", "AskUserQuestion(*)", "Bash(*)", "CronCreate(*)",
@@ -1229,7 +1287,7 @@ def _write_claude_settings():
         "env": env_block,
     }
     (settings_dir / "settings.local.json").write_text(json.dumps(settings, indent=2))
-    _log(f"wrote .claude/settings.local.json (provider={PROVIDER}, model={CLAUDE_MODEL}, target={target_label})")
+    _log(f"wrote .claude/settings.local.json (provider={provider}, model={model}, target={target_label})")
 
 
 def _claude_env(goal_index: int = 0) -> dict[str, str]:
@@ -1237,10 +1295,19 @@ def _claude_env(goal_index: int = 0) -> dict[str, str]:
     env.pop("TAU_BOT_TOKEN", None)
     if goal_index:
         env["ARBOS_GOAL_INDEX"] = str(goal_index)
-    if PROVIDER == "openrouter":
+
+    provider = FALLBACK_PROVIDER if _using_fallback else PROVIDER
+
+    if provider == "anthropic":
+        env.pop("ANTHROPIC_API_KEY", None)
+        env.pop("ANTHROPIC_BASE_URL", None)
+        env.pop("ANTHROPIC_AUTH_TOKEN", None)
+    elif provider == "openrouter":
+        api_key = FALLBACK_API_KEY if _using_fallback else LLM_API_KEY
+        base_url = FALLBACK_BASE_URL if _using_fallback else LLM_BASE_URL
         env["ANTHROPIC_API_KEY"] = ""
-        env["ANTHROPIC_BASE_URL"] = LLM_BASE_URL
-        env["ANTHROPIC_AUTH_TOKEN"] = LLM_API_KEY
+        env["ANTHROPIC_BASE_URL"] = base_url
+        env["ANTHROPIC_AUTH_TOKEN"] = api_key
     else:
         env["ANTHROPIC_API_KEY"] = "chutes-proxy"
         env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{PROXY_PORT}"
@@ -1359,12 +1426,12 @@ def run_agent(cmd: list[str], phase: str, output_file: Path,
               on_text=None, on_activity=None, goal_index: int = 0) -> subprocess.CompletedProcess:
     _claude_semaphore.acquire()
     try:
-        env = _claude_env(goal_index=goal_index)
         flags = " ".join(a for a in cmd if a.startswith("-"))
 
         returncode, result_text, raw_lines, stderr_output = 1, "", [], "no attempts made"
 
         for attempt in range(1, MAX_RETRIES + 1):
+            env = _claude_env(goal_index=goal_index)
             _log(f"{phase}: starting (attempt={attempt}) flags=[{flags}]")
             t0 = time.monotonic()
 
@@ -1378,6 +1445,9 @@ def run_agent(cmd: list[str], phase: str, output_file: Path,
 
             if returncode != 0 and stderr_output.strip():
                 _log(f"{phase}: stderr {stderr_output.strip()[:300]}")
+                if _is_quota_error(stderr_output) and not _using_fallback:
+                    _switch_to_fallback()
+                    continue
                 if attempt < MAX_RETRIES:
                     delay = min(2 ** attempt, 30)
                     _log(f"{phase}: retrying in {delay}s (attempt {attempt}/{MAX_RETRIES})")
@@ -1574,6 +1644,9 @@ def _goal_loop(index: int):
         with _goals_lock:
             _save_goals()
 
+        if _using_fallback:
+            _try_primary()
+
         _log(f"Goal #{index} Step {gs.step_count} (global step {_step_count})", blank=True)
 
         prompt = load_prompt(goal_index=index, consume_inbox=True, goal_step=gs.step_count)
@@ -1635,7 +1708,11 @@ def _goal_manager():
 def _summarize_goal(text: str) -> str:
     """Generate a one-line summary of a goal via LLM. Falls back to truncation."""
     try:
-        if PROVIDER == "openrouter":
+        if PROVIDER == "anthropic":
+            url = f"{FALLBACK_BASE_URL}/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {FALLBACK_API_KEY}", "Content-Type": "application/json"}
+            model = FALLBACK_MODEL
+        elif PROVIDER == "openrouter":
             url = f"{LLM_BASE_URL}/v1/chat/completions"
             headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
             model = CLAUDE_MODEL
@@ -1824,7 +1901,7 @@ def _format_tool_activity(tool_name: str, tool_input: dict) -> str:
 
 def run_agent_streaming(bot, prompt: str, chat_id: int) -> str:
     """Run Claude Code CLI and stream output into a Telegram message."""
-    if PROVIDER == "openrouter":
+    if PROVIDER in ("openrouter", "anthropic"):
         cmd = _claude_cmd(prompt)
     else:
         cmd = _claude_cmd(prompt, extra_flags=["--model", "bot"])
@@ -2564,7 +2641,10 @@ def main() -> None:
     _load_goals()
     _log(f"loaded {len(_goals)} goal(s) from goals.json")
 
-    if not LLM_API_KEY:
+    if PROVIDER == "anthropic":
+        if not FALLBACK_API_KEY:
+            _log(f"WARNING: OPENROUTER_API_KEY not set — fallback will not work")
+    elif not LLM_API_KEY:
         key_name = "OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "CHUTES_API_KEY"
         _log(f"WARNING: {key_name} not set — LLM calls will fail")
 
@@ -2576,12 +2656,12 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_shutdown_signal)
     signal.signal(signal.SIGINT, _handle_shutdown_signal)
 
-    if PROVIDER != "openrouter":
+    if PROVIDER == "chutes":
         _log(f"starting chutes proxy thread (port={PROXY_PORT}, agent={CHUTES_ROUTING_AGENT}, bot={CHUTES_ROUTING_BOT})")
         threading.Thread(target=_start_proxy, daemon=True).start()
         time.sleep(1)
     else:
-        _log(f"openrouter direct mode — no proxy needed (target={LLM_BASE_URL})")
+        _log(f"{PROVIDER} direct mode — no proxy needed")
 
     _write_claude_settings()
 
