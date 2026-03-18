@@ -366,18 +366,21 @@ class TradingSystem:
         )
         signals = consensus.decide(top_models, X_valid)
 
-        # Step 102: Best-balance mean-reversion signal (87th pct + 0.38/0.62 taker + RSI 45/55)
-        # Result: ~62% accuracy, 141 bets/month — meets count target, below 65% accuracy target
-        # Fundamental limit: mean-reversion negative skew requires 67.6%+ accuracy for break-even at maker fees
-        # Next iteration should explore: order book data, cross-asset signals, or trend-following approach
-        if "taker_buy_ratio" in X_valid.columns and "ret_lag_1" in X_valid.columns:
-            # Large move threshold: top 13% absolute return (from train data, no leakage)
+        # Step 108: Isolated spike filter — current bar is large DOWN but previous bar was normal
+        # Hypothesis: lone exhaustion spikes are more likely to reverse than multi-bar momentum
+        # Signal: large bar at T AND previous bar (T-1) was NOT large (isolated selling)
+        # Target: step 102 conditions + isolated spike → keep 90+/month, improve fold 2 accuracy
+        if "taker_buy_ratio" in X_valid.columns and "ret_lag_1" in X_valid.columns and "ret_lag_2" in X_valid.columns:
             train_abs_ret = train_df["ret_lag_1"].abs() if "ret_lag_1" in train_df.columns else pd.Series([0])
             move_threshold = float(train_abs_ret.quantile(0.87))
 
             current_ret = X_valid["ret_lag_1"]
-            current_bar_large_down = current_ret < -move_threshold
-            current_bar_large_up = current_ret > move_threshold
+            prev_ret = X_valid["ret_lag_2"]
+
+            # Isolated spike: current bar is large, previous bar was NOT large (not a trend)
+            current_large_down = current_ret < -move_threshold
+            current_large_up = current_ret > move_threshold
+            prev_not_large = prev_ret.abs() < move_threshold  # previous bar was normal
 
             taker_low = X_valid["taker_buy_ratio"] < 0.38
             taker_high = X_valid["taker_buy_ratio"] > 0.62
@@ -391,14 +394,14 @@ class TradingSystem:
                 rsi_overbought = pd.Series(True, index=X_valid.index)
 
             rule_signals = pd.Series(-1, index=X_valid.index)
-            rule_signals[current_bar_large_down & taker_low & rsi_oversold] = 1
-            rule_signals[current_bar_large_up & taker_high & rsi_overbought] = 0
+            rule_signals[current_large_down & prev_not_large & taker_low & rsi_oversold] = 1
+            rule_signals[current_large_up & prev_not_large & taker_high & rsi_overbought] = 0
             signals = rule_signals
 
             n_signals = (signals != -1).sum()
             n_up = (signals == 1).sum()
             n_down = (signals == 0).sum()
-            print(f"  Rule signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}", flush=True)
+            print(f"  Isolated spike signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}", flush=True)
 
         # Run simulator with configured hold period
         self.trader.run(signals, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)

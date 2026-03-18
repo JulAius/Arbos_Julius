@@ -1,0 +1,213 @@
+[main] main() started
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Last candle: 2026-03-18 21:45:00 (age: 11.1 min)
+Loaded 77560 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-18 21:45:00
+Online mode: limited data to last 180 days (17281 rows)
+[main] Starting feature preparation...
+Preparing features...
+[futures] Loaded cached futures features (77558 rows, age=0.7h)
+  Merged 16 futures features (funding rate, L/S, OI)
+  Generating horizon features...
+[horizon] Starting feature generation: 17281 rows, horizons=['15m', '30m', '1h']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon] Merging 84 features for horizon 15m...
+[horizon]   Merged (result now has 17281 rows, 85 cols)
+[horizon] Horizon 30m: resampling by factor 2...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 8641 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 30m features prepared (8641 rows)
+[horizon] Merging 56 features for horizon 30m...
+[horizon]   Merged (result now has 17281 rows, 141 cols)
+[horizon] Horizon 1h: resampling by factor 4...
+/home/julien/projects/Bittensor/Arbos/arbos_trading/features/horizon.py:31: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+[horizon]   Resampled to 4321 rows
+[horizon]   Adding technical indicators...
+[horizon]   Adding regime features...
+[horizon]   Horizon 1h features prepared (4321 rows)
+[horizon] Merging 56 features for horizon 1h...
+[horizon]   Merged (result now has 17281 rows, 197 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 17281 rows, 197 columns
+Prepared 17160 samples with 224 columns
+Feature count: 212
+[main] Feature preparation complete: 17160 rows, 212 features
+Limited training to 5000 most recent samples
+Evolving population (input_dim=212)...
+  Generation 1/1
+    Training individual 1/7 (lightgbm)
+      -> fitness=0.9694
+    Training individual 2/7 (lightgbm)
+      -> fitness=0.9756
+    Training individual 3/7 (lightgbm)
+      -> fitness=0.9990
+    Training individual 4/7 (lightgbm)
+      -> fitness=0.9950
+    Training individual 5/7 (lightgbm)
+      -> fitness=0.9258
+    Training individual 6/7 (lightgbm)
+      -> fitness=1.0000
+    Training individual 7/7 (lightgbm)
+      -> fitness=0.9992
+    Best fitness: 1.0000 (model=lightgbm)
+Using 11521 recent samples for walk-forward validation (max 120 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.8744 (lightgbm)
+  Model 1: profit_factor=0.7163
+  Model 2: profit_factor=0.6724
+  Model 3: profit_factor=0.6940
+  Model 4: profit_factor=0.6932
+  Model 5: profit_factor=0.6555
+  Model 6: profit_factor=0.6973
+  Model 7: profit_factor=0.6635
+
+Top 10 feature importances:
+  ret_lag_2: 27.0000
+  taker_buy_ratio_ma5: 27.0000
+  ret_lag_7: 25.0000
+  ret_lag_4: 23.0000
+  ret_lag_5: 23.0000
+  ret_lag_6_30m: 23.0000
+  rsi: 22.0000
+  vwap_dev: 22.0000
+  ret_lag_8: 21.0000
+  vol_lag_2: 21.0000
+  ATR-norm signals: 107 total (76 UP, 31 DOWN), norm_threshold=0.00
+Fold result: accuracy=0.6636, bets/month=155.10, trades=107, sharpe=-3.149
+
+Fold 2/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.9624 (lightgbm)
+  Model 1: profit_factor=0.6891
+  Model 2: profit_factor=0.7492
+  Model 3: profit_factor=0.7060
+  Model 4: profit_factor=0.7601
+  Model 5: profit_factor=0.7187
+  Model 6: profit_factor=0.7305
+  Model 7: profit_factor=0.7197
+
+Top 10 feature importances:
+  ret_lag_4: 41.0000
+  ret_lag_9_30m: 38.0000
+  stoch_k: 35.0000
+  ret_lag_9: 35.0000
+  vol_lag_4: 31.0000
+  ret_lag_6: 28.0000
+  ret_lag_6_30m: 28.0000
+  ret_lag_2: 27.0000
+  ret_lag_2_1h: 27.0000
+  mom_1: 25.0000
+  ATR-norm signals: 111 total (63 UP, 48 DOWN), norm_threshold=0.00
+Fold result: accuracy=0.5856, bets/month=160.90, trades=111, sharpe=-2.090
+
+Fold 3/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.8806 (lightgbm)
+  Model 1: profit_factor=0.6552
+  Model 2: profit_factor=0.7081
+  Model 3: profit_factor=0.7154
+  Model 4: profit_factor=0.6477
+  Model 5: profit_factor=0.7281
+  Model 6: profit_factor=0.7485
+  Model 7: profit_factor=0.6822
+
+Top 10 feature importances:
+  ret_lag_6: 77.0000
+  mom_1: 66.0000
+  ret_lag_3: 66.0000
+  ret_lag_5: 61.0000
+  ret_lag_9: 59.0000
+  price_range: 59.0000
+  ret_lag_8: 55.0000
+  ret_lag_10: 55.0000
+  mom_2: 54.0000
+  ret_lag_4: 54.0000
+  ATR-norm signals: 101 total (50 UP, 51 DOWN), norm_threshold=0.00
+Fold result: accuracy=0.6436, bets/month=146.40, trades=101, sharpe=-1.479
+
+Multi-fold combined (3 folds): accuracy=0.6301, bets/month=154.13, Sharpe=-2.240, total_return=-0.0032, trades=319
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 2 top models for retraining
+  Retraining model 1/2 (lightgbm)
+    Done
+  Retraining model 2/2 (lightgbm)
+    Done
+Training horizon ensemble for 2 horizons...
+  Horizon 30m (factor=2)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 2881 rows
+    Prepared 2850 samples with 64 features
+  Horizon 1h (factor=4)
+/home/julien/projects/Bittensor/Arbos/arbos_trading/data/processor.py:56: FutureWarning: 'T' is deprecated and will be removed in a future version, please use 'min' instead.
+  resampled = df_idx[["open", "high", "low", "close", "volume"]].resample(f"{horizon_minutes}T").agg({
+    Resampled to 1441 rows
+    Prepared 1410 samples with 64 features
+Fitting horizon ensembles for 2 horizons
+  Horizon 30m (1/2): processing 2850 rows
+    Feature count: 56, training samples: 2850
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 30m
+  Horizon 1h (2/2): processing 1410 rows
+    Feature count: 56, training samples: 1410
+    Training 5 models...
+[horizon]   Training model 1/5 (random_forest)...
+[horizon]   Model 1 trained
+[horizon]   Training model 2/5 (random_forest)...
+[horizon]   Model 2 trained
+[horizon]   Training model 3/5 (random_forest)...
+[horizon]   Model 3 trained
+[horizon]   Training model 4/5 (random_forest)...
+[horizon]   Model 4 trained
+[horizon]   Training model 5/5 (random_forest)...
+[horizon]   Model 5 trained
+    Completed horizon 1h
+All horizon ensembles fitted
+Horizon ensemble training complete
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260318_215813
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-18T21:58:13.353843",
+  "accuracy": 0.6300940438871473,
+  "bets_per_month": 154.13269841269843,
+  "sharpe": -2.239547922634953,
+  "max_drawdown": 0.0026979866785944535,
+  "total_return": -0.0032348870558462296,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 1.0,
+    "1": 0.9992,
+    "2": 0.999,
+    "3": 0.995,
+    "4": 0.9756
+  }
+}
+============================================================
+
+Step completed. Latest signal: -1
+Accuracy: 0.6301, Bets/month: 154.13

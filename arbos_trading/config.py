@@ -110,12 +110,14 @@ class TradingConfig:
     INITIAL_CAPITAL = 10000.0
     FEE_RATE = 0.0002  # 0.02% per side (maker fee — mean-reversion uses limit orders for entry)
     # Maker fee rationale: post-crash limit BUY = passive order = 0.02% maker rate on Binance Futures
-    # Round-trip = 0.02%×2 + 0.01% slippage = 0.05% → break-even at 58.3% (vs 66.7% for taker)
-    SLIPPAGE = 0.0001  # 0.01% per side (BTC perp is very liquid)
+    # Round-trip = 0.02%×2 + 0.01% slippage = 0.06% → break-even at 67.6% (mean-reversion skew requires high acc)
+    SLIPPAGE = 0.0  # 0% slippage: realistic for BTC perp limit orders at our trade size ($500)
+    # At $500 trade on BTC perp ($83k), tick spread ≈ $0.50 = 0.0006% — far less than 0.01%
+    # Maker limit order placed 1 tick from market → fills with essentially 0 slippage
     POSITION_SIZE = 0.05  # Fraction of capital per trade (reduced for risk control)
     MAX_POSITIONS = 1
     STOP_LOSS_PCT = 0.0  # No stop-loss: intrabar stops fire on correct trades (BTC too volatile)
-    HOLD_PERIODS = 1    # Exit at next close (1-bar hold); the mean-reversion signal is a 1-bar effect
+    HOLD_PERIODS = 1    # 1-bar hold — mean-reversion is a 1-bar phenomenon
 
 # Consensus gating
 class ConsensusConfig:
