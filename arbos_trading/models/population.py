@@ -64,7 +64,13 @@ class Population:
 
     def _random_params(self, model_type: str) -> dict:
         """Generate random hyperparameters for a model type."""
-        if model_type == "extra_trees":
+        if model_type == "lightgbm":
+            n_estimators = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_N_ESTIMATORS', [200, 300, 400])))
+            learning_rate = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_LEARNING_RATE', [0.02, 0.05, 0.1])))
+            num_leaves = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_NUM_LEAVES', [31, 63, 127])))
+            min_child_samples = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_MIN_CHILD_SAMPLES', [10, 20, 50])))
+            return {"n_estimators": n_estimators, "learning_rate": learning_rate, "num_leaves": num_leaves, "min_child_samples": min_child_samples}
+        elif model_type == "extra_trees":
             n_estimators = int(np.random.choice(getattr(ModelConfig, 'EXTRA_TREES_N_ESTIMATORS', [50, 100])))
             max_depth = random.choice(getattr(ModelConfig, 'EXTRA_TREES_MAX_DEPTH', [8, 10, 12]))
             min_samples_leaf = random.choice(getattr(ModelConfig, 'EXTRA_TREES_MIN_SAMPLES_LEAF', [5, 10]))
@@ -146,7 +152,16 @@ class Population:
         new_params = individual.params.copy()
         model_type = individual.model_type
 
-        if model_type == "extra_trees":
+        if model_type == "lightgbm":
+            if random.random() < 0.5:
+                new_params["n_estimators"] = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_N_ESTIMATORS', [200, 300, 400])))
+            if random.random() < 0.5:
+                new_params["learning_rate"] = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_LEARNING_RATE', [0.02, 0.05, 0.1])))
+            if random.random() < 0.3:
+                new_params["num_leaves"] = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_NUM_LEAVES', [31, 63, 127])))
+            if random.random() < 0.3:
+                new_params["min_child_samples"] = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_MIN_CHILD_SAMPLES', [10, 20, 50])))
+        elif model_type == "extra_trees":
             if random.random() < 0.5:
                 new_params["n_estimators"] = int(np.random.choice(getattr(ModelConfig, 'EXTRA_TREES_N_ESTIMATORS', [50, 100])))
             if random.random() < 0.5:

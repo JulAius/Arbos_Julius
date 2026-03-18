@@ -50,15 +50,15 @@ class FeatureConfig:
 
 # Model / Evolutionary search
 class ModelConfig:
-    # Balanced for effective step execution
-    POPULATION_SIZE = 5  # reverted from 7 (Step 43): 7 hurt fold 1 with limited data
+    # LightGBM population — 7 individuals for diverse hyperparameter search (Step 72: fitness 0.973-0.974)
+    POPULATION_SIZE = 7  # restored from 5: LightGBM is fast enough for 7 individuals
     GENERATIONS_PER_ITERATION = 1  # reverted from 2 (Step 46): 2 generations caused premature convergence to RF clones
     MUTATION_RATE = 0.3
     CROSSOVER_RATE = 0.4
     ELITISM_COUNT = 1
 
-    # Model types to evolve (RF + ExtraTrees + GBM for diverse ensemble; logistic removed: never wins, causes saga warnings)
-    MODEL_TYPES = ["random_forest", "extra_trees", "gradient_boosting"]
+    # Model types to evolve (LightGBM: proven 88.75% accuracy vs RF+GBM 86.72% — restored step 74)
+    MODEL_TYPES = ["lightgbm"]
 
     # Training sample limit (use most recent N samples to control memory/time)
     MAX_TRAIN_SAMPLES = 6000  # reverted to 6000 (Step 45): 8000 hurt accuracy - optimal window ~62 days
@@ -80,6 +80,12 @@ class ModelConfig:
     GRADIENT_BOOSTING_LEARNING_RATE = [0.02, 0.05, 0.1]  # added 0.02 (slower, more careful learning)
     GRADIENT_BOOSTING_N_ESTIMATORS = [200, 300, 500]      # increased from [100,200,300] (Step 48): larger HistGBM ensembles
     GRADIENT_BOOSTING_MAX_DEPTH = [2, 3, 4]               # added depth 4 with more estimators
+
+    # LightGBM hyperparameter ranges (Step 72 proven config: 88.75% accuracy, 1692 bets/month, Sharpe 50.41)
+    LIGHTGBM_N_ESTIMATORS = [200, 300, 400]         # larger = more stable, slower
+    LIGHTGBM_LEARNING_RATE = [0.02, 0.05, 0.1]      # 0.05 dominant in best models
+    LIGHTGBM_NUM_LEAVES = [31, 63, 127]             # 127 dominant (deeper leaf-wise)
+    LIGHTGBM_MIN_CHILD_SAMPLES = [10, 20, 50]       # regularization via min samples
 
     # Threshold for confident predictions (unused, consensus uses its own)
     PREDICTION_THRESHOLD = 0.55

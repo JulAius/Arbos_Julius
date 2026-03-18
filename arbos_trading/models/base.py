@@ -463,6 +463,61 @@ class ExtraTreesModel(BaseModel):
         self._calibrated = None
 
 
+class LightGBMModel(BaseModel):
+    """LightGBM classifier — fast gradient boosting with leaf-wise growth."""
+
+    def __init__(
+        self,
+        n_estimators: int = 300,
+        learning_rate: float = 0.05,
+        num_leaves: int = 63,
+        min_child_samples: int = 20,
+        random_state: int = 42,
+        input_dim: int = None,
+        **kwargs
+    ):
+        import lightgbm as lgb
+        self.model = lgb.LGBMClassifier(
+            n_estimators=n_estimators,
+            learning_rate=learning_rate,
+            num_leaves=num_leaves,
+            min_child_samples=min_child_samples,
+            random_state=random_state,
+            verbose=-1,
+            n_jobs=1
+        )
+        self._params = {
+            "n_estimators": n_estimators,
+            "learning_rate": learning_rate,
+            "num_leaves": num_leaves,
+            "min_child_samples": min_child_samples,
+            "random_state": random_state,
+        }
+        self.is_fitted = False
+
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "LightGBMModel":
+        self.model.fit(X, y)
+        self.is_fitted = True
+        return self
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        if not self.is_fitted:
+            raise RuntimeError("Model must be fitted first")
+        return self.model.predict_proba(X)[:, 1]
+
+    def predict(self, X: pd.DataFrame, threshold: float = 0.5) -> np.ndarray:
+        proba = self.predict_proba(X)
+        return (proba >= threshold).astype(int)
+
+    def get_params(self) -> dict:
+        return self._params.copy()
+
+    def set_params(self, params: dict):
+        self._params.update(params)
+        self.model.set_params(**{k: v for k, v in params.items() if k != "random_state"})
+        self.is_fitted = False
+
+
 # Factory function
 MODEL_REGISTRY = {
     "logistic": LogisticModel,
@@ -470,6 +525,7 @@ MODEL_REGISTRY = {
     "gradient_boosting": GradientBoostingModel,
     "extra_trees": ExtraTreesModel,
     "simple_nn": SimpleNNModel,
+    "lightgbm": LightGBMModel,
 }
 
 def create_model(model_type: str, **kwargs) -> BaseModel:
