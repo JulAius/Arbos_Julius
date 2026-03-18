@@ -246,7 +246,7 @@ else:
     COST_PER_M_OUTPUT = float(os.environ.get("COST_PER_M_OUTPUT", "0.60"))
 IS_ROOT = os.getuid() == 0
 MAX_RETRIES = int(os.environ.get("CLAUDE_MAX_RETRIES", "5"))
-CLAUDE_TIMEOUT = int(os.environ.get("CLAUDE_TIMEOUT", "600"))
+CLAUDE_TIMEOUT = int(os.environ.get("CLAUDE_TIMEOUT", "3600"))
 _tls = threading.local()
 _log_lock = threading.Lock()
 _chatlog_lock = threading.Lock()
@@ -1245,6 +1245,7 @@ def _claude_env(goal_index: int = 0) -> dict[str, str]:
         env["ANTHROPIC_API_KEY"] = "chutes-proxy"
         env["ANTHROPIC_BASE_URL"] = f"http://127.0.0.1:{PROXY_PORT}"
         env["ANTHROPIC_AUTH_TOKEN"] = ""
+    env["PYTHONUNBUFFERED"] = "1"
     return env
 
 
@@ -2567,11 +2568,13 @@ def main() -> None:
         key_name = "OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "CHUTES_API_KEY"
         _log(f"WARNING: {key_name} not set — LLM calls will fail")
 
-    def _handle_sigterm(signum, frame):
-        _log("SIGTERM received; shutting down gracefully")
+    def _handle_shutdown_signal(signum, frame):
+        sig_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+        _log(f"{sig_name} received; shutting down gracefully")
         _shutdown.set()
 
-    signal.signal(signal.SIGTERM, _handle_sigterm)
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
 
     if PROVIDER != "openrouter":
         _log(f"starting chutes proxy thread (port={PROXY_PORT}, agent={CHUTES_ROUTING_AGENT}, bot={CHUTES_ROUTING_BOT})")
