@@ -2,7 +2,7 @@
 
 <p align="center">
   Arbos is a <a href="https://ghuntley.com/loop/">Ralph-loop</a> combined with a Telegram bot.<br>
-  It loops a goal through Claude Code, powered by Anthropic with an OpenRouter fallback.
+  It loops a goal through Claude Code, powered by Anthropic with a configurable fallback (OpenRouter or OpenCode).
 </p>
 
 ## The Design
@@ -22,15 +22,16 @@ Arbos loops a `GOAL.md` through a coding agent, step after step, with no memory 
 | Priority | Provider | Model | Auth |
 |----------|----------|-------|------|
 | Primary | **Anthropic** | `claude-sonnet-4-6` | Claude Code Pro (OAuth) |
-| Fallback | **OpenRouter** | `stepfun/step-3.5-flash:free` | API key |
+| Fallback A | **OpenRouter** | `stepfun/step-3.5-flash:free` | API key |
+| Fallback B | **OpenCode** | `minimax-m2.5-free` | OpenCode API key |
 
-When the Anthropic quota is exceeded, Arbos automatically switches to the OpenRouter free model. At each new step, it retries Anthropic first.
+When the Anthropic quota is exceeded, Arbos automatically switches to the configured fallback. Set `FALLBACK_PROVIDER=openrouter` or `FALLBACK_PROVIDER=opencode` in `.env`. At each new step, it retries Anthropic first.
 
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with Pro auth (`claude login`)
 - [Telegram Bot token](https://core.telegram.org/bots#how-do-i-create-a-bot)
-- [OpenRouter API key](https://openrouter.ai) (for fallback)
+- Fallback: [OpenRouter API key](https://openrouter.ai) or [OpenCode CLI](https://opencode.ai) (`curl -fsSL https://opencode.ai/install | bash`) + API key
 - Python 3.10+, `pm2`
 
 ## Getting started
@@ -80,9 +81,17 @@ See `.env.example` for all options:
 ```env
 PROVIDER=anthropic              # primary provider
 CLAUDE_MODEL=claude-sonnet-4-6  # primary model
-FALLBACK_PROVIDER=openrouter    # fallback on quota exceeded
+
+# Fallback A: OpenRouter (Claude Code CLI + OpenRouter)
+FALLBACK_PROVIDER=openrouter
 FALLBACK_MODEL=stepfun/step-3.5-flash:free
-OPENROUTER_API_KEY=sk-or-...    # fallback API key
+OPENROUTER_API_KEY=sk-or-...    # required for openrouter fallback
+
+# Fallback B: OpenCode (OpenCode CLI + MiniMax)
+FALLBACK_PROVIDER=opencode
+FALLBACK_MODEL=minimax-m2.5-free
+OPENCODE_API_KEY=...             # required for opencode fallback
+
 TAU_BOT_TOKEN=...               # Telegram bot token
 TELEGRAM_OWNER_ID=...           # your Telegram user ID
 AUTO_PUSH=true                  # enable agent-triggered auto-push
