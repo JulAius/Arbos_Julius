@@ -266,6 +266,7 @@ AUTO_PUSH_REMOTE = os.environ.get("AUTO_PUSH_REMOTE", "origin")
 AUTO_PUSH_BRANCH = os.environ.get("AUTO_PUSH_BRANCH", "main")
 PUSH_MIN_ACCURACY = float(os.environ.get("PUSH_MIN_ACCURACY", "0.60"))
 PUSH_MIN_SHARPE = float(os.environ.get("PUSH_MIN_SHARPE", "0"))
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 _provider_lock = threading.Lock()
 _using_fallback = False
@@ -1682,12 +1683,29 @@ def _auto_push_if_profitable(step_num: int, goal_index: int = 1):
             _log(f"auto-push: commit failed: {r.stderr.strip()[:200]}")
             return
 
+        push_env = os.environ.copy()
+        if GITHUB_TOKEN:
+            push_env["GIT_ASKPASS"] = "echo"
+            push_env["GIT_TERMINAL_PROMPT"] = "0"
+            remote_url = subprocess.run(
+                ["git", "remote", "get-url", AUTO_PUSH_REMOTE],
+                cwd=WORKING_DIR, capture_output=True, text=True, timeout=5,
+            ).stdout.strip()
+            if remote_url.startswith("https://github.com/"):
+                auth_url = remote_url.replace("https://github.com/", f"https://x-access-token:{GITHUB_TOKEN}@github.com/")
+                push_target = [auth_url, AUTO_PUSH_BRANCH]
+            else:
+                push_target = [AUTO_PUSH_REMOTE, AUTO_PUSH_BRANCH]
+        else:
+            push_target = [AUTO_PUSH_REMOTE, AUTO_PUSH_BRANCH]
+
         r = subprocess.run(
-            ["git", "push", AUTO_PUSH_REMOTE, AUTO_PUSH_BRANCH],
+            ["git", "push"] + push_target,
             cwd=WORKING_DIR, capture_output=True, text=True, timeout=30,
+            env=push_env,
         )
         if r.returncode != 0:
-            _log(f"auto-push: push failed: {r.stderr.strip()[:200]}")
+            _log(f"auto-push: push failed: {_redact_secrets(r.stderr.strip()[:200])}")
             return
 
         _log(f"auto-push: pushed ({msg})")
