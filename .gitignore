@@ -31,7 +31,6 @@ uv.lock
 Thumbs.db
 
 # Runtime / state
-.arbos-launch.sh
 .arbos.pid
 .restart
 chat_id.txt
