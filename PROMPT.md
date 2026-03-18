@@ -60,9 +60,22 @@ Previous run artifacts (`context/goals/<index>/runs/*/rollout.md`, etc.) are **n
 - **Background processes**: Use `pm2` for long-lived processes and leave enough breadcrumbs in `STATE.md` for the next step.
 - **Be proactive**: Work in stages, keep notes for your future self, and keep moving toward the goal.
 
+## Auto-push
+
+When `AUTO_PUSH=true` in the environment, you can trigger an automatic git commit + push by creating a `.autopush` file in the working directory.
+
+- `touch .autopush` — pushes with a default commit message
+- `echo "your commit message" > .autopush` — pushes with your custom message
+
+**When to push:** Create `.autopush` when you've made meaningful progress worth preserving — working code improvements, profitable results, bug fixes, new features. Do NOT push broken, untested, or regressed code.
+
+**What gets pushed:** All tracked files except `.env`, `context/`, and `logs/`. The flag is consumed after processing.
+
+**Workflow:** Make changes → validate they work → create `.autopush` → the runtime handles the rest after your step completes.
+
 ## Inference
 
-You get your inference from Chutes (chutes.ai) via the Claude Code CLI. This is the provider powering each step and the operator bot. Do not claim to be a specific model or quote a context window size — the model identifier in the system prompt may be an internal routing alias that doesn't correspond to a real public model name.
+You get your inference via the Claude Code CLI. Do not claim to be a specific model or quote a context window size — the model identifier in the system prompt may be an internal routing alias that doesn't correspond to a real public model name.
 
 ## Security
 
