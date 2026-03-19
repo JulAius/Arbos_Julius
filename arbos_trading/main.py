@@ -511,9 +511,24 @@ class TradingSystem:
             price_vs_ma20 = pd.Series(0.0, index=X_valid.index)
             mom_1d = pd.Series(0.0, index=X_valid.index)
 
+        # Compute shorter-period momentum for faster regime detection
+        # 3-day = 288 bars, 5-day = 480 bars
+        if len(valid_close) >= 289:
+            mom_3d = valid_close.pct_change(288).shift(1).reindex(X_valid.index).fillna(0)
+        else:
+            mom_3d = pd.Series(0.0, index=X_valid.index)
+        if len(valid_close) >= 481:
+            mom_5d = valid_close.pct_change(480).shift(1).reindex(X_valid.index).fillna(0)
+        else:
+            mom_5d = pd.Series(0.0, index=X_valid.index)
+
         # Test multiple regime thresholds
         print(
             f"  Regime stats: mom_7d: mean={mom_7d.mean():.4f}, min={mom_7d.min():.4f}, <-5%={(mom_7d < -0.05).sum()}, <-3%={(mom_7d < -0.03).sum()}, <-2%={(mom_7d < -0.02).sum()}, <-1%={(mom_7d < -0.01).sum()}",
+            flush=True,
+        )
+        print(
+            f"  Regime stats: mom_3d: mean={mom_3d.mean():.4f}, <-2%={(mom_3d < -0.02).sum()}, <-1%={(mom_3d < -0.01).sum()}  |  mom_5d: mean={mom_5d.mean():.4f}, <-2%={(mom_5d < -0.02).sum()}",
             flush=True,
         )
         print(
@@ -521,17 +536,6 @@ class TradingSystem:
             flush=True,
         )
 
-        # Threshold variants to test
-        thresholds = {
-            "rule_only": -999.0,  # no filter
-            "mom7d_-5pct": -0.05,
-            "mom7d_-3pct": -0.03,
-            "mom7d_-2pct": -0.02,
-            "mom7d_-1pct": -0.01,
-            "ma20_bearish": 0.0,  # price < MA20
-            "ma20_-2pct": -0.02,  # price < MA20 * 0.98
-            "ma20_-5pct": -0.05,  # price < MA20 * 0.95
-        }
         regime_map = {
             "rule_only": (
                 pd.Series(False, index=X_valid.index),
@@ -541,6 +545,12 @@ class TradingSystem:
             "mom7d_-3pct": (mom_7d < -0.03, mom_7d > 0.03),
             "mom7d_-2pct": (mom_7d < -0.02, mom_7d > 0.02),
             "mom7d_-1pct": (mom_7d < -0.01, mom_7d > 0.01),
+            "mom5d_-3pct": (mom_5d < -0.03, mom_5d > 0.03),
+            "mom5d_-2pct": (mom_5d < -0.02, mom_5d > 0.02),
+            "mom5d_-1pct": (mom_5d < -0.01, mom_5d > 0.01),
+            "mom3d_-3pct": (mom_3d < -0.03, mom_3d > 0.03),
+            "mom3d_-2pct": (mom_3d < -0.02, mom_3d > 0.02),
+            "mom3d_-1pct": (mom_3d < -0.01, mom_3d > 0.01),
             "ma20_bearish": (price_vs_ma20 < 0.0, price_vs_ma20 > 0.0),
             "ma20_-2pct": (price_vs_ma20 < -0.02, price_vs_ma20 > 0.02),
             "ma20_-5pct": (price_vs_ma20 < -0.05, price_vs_ma20 > 0.05),
@@ -576,12 +586,32 @@ class TradingSystem:
             & rsi_overbought
         ] = 1  # BET UP (continue the rise)
 
-        # Test all signal variants and pick the best
-        best_acc = 0.0
+        # Step 122: Two-stage selection — prioritize bpm >= 90 variants.
+        # Track two separate bests: one for bpm >= 90 (primary target), one for bpm >= 60 (fallback).
+        best_acc_90 = 0.0  # best accuracy among bpm >= 90 variants
+        best_name_90 = None
+        best_signals_90 = None
+        best_n_90 = 0
+        best_acc = 0.0  # fallback: best accuracy among bpm >= 60 variants
         best_name = "rule_only"
         best_signals = rule_signals.copy()
         best_n = 0
 
+        def _update_best_variants(name, test_signals, n_active, acc, bpm):
+            nonlocal best_acc_90, best_name_90, best_signals_90, best_n_90
+            nonlocal best_acc, best_name, best_signals, best_n
+            if bpm >= 90 and acc > best_acc_90:
+                best_acc_90 = acc
+                best_name_90 = name
+                best_signals_90 = test_signals.copy()
+                best_n_90 = n_active
+            if bpm >= 60 and acc > best_acc:
+                best_acc = acc
+                best_name = name
+                best_signals = test_signals.copy()
+                best_n = n_active
+
+        # Test MR (suppress) variants
         for name, (downtrend_mask, uptrend_mask) in regime_map.items():
             test_signals = rule_signals.copy()
             test_signals[(rule_signals == 1) & downtrend_mask] = -1
@@ -597,21 +627,12 @@ class TradingSystem:
             acc = (test_signals[mask] == y_valid[mask]).mean()
             bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
 
-            print(
-                f"    MR_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True
-            )
+            print(f"    MR_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True)
+            _update_best_variants(f"MR_{name}", test_signals, n_active, acc, bpm)
 
-            if acc > best_acc and bpm >= 60:
-                best_acc = acc
-                best_name = f"MR_{name}"
-                best_signals = test_signals.copy()
-                best_n = n_active
-
-        # Also test MOMENTUM CONTINUATION variant in downtrends
+        # Test MOM (suppress) variants
         for name, (downtrend_mask, uptrend_mask) in regime_map.items():
-            # In downtrends: use momentum (bet with the trend)
             test_signals = momentum_signals.copy()
-            # In uptrends: also use momentum
             test_signals[(momentum_signals == 1) & uptrend_mask] = -1
             test_signals[(momentum_signals == 0) & downtrend_mask] = -1
 
@@ -625,21 +646,51 @@ class TradingSystem:
             acc = (test_signals[mask] == y_valid[mask]).mean()
             bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
 
-            print(
-                f"    MOM_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}",
-                flush=True,
-            )
+            print(f"    MOM_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True)
+            _update_best_variants(f"MOM_{name}", test_signals, n_active, acc, bpm)
 
-            if acc > best_acc and bpm >= 60:
-                best_acc = acc
-                best_name = f"MOM_{name}"
-                best_signals = test_signals.copy()
-                best_n = n_active
+        # Step 122: SWITCH variant — flip direction in trending regimes instead of suppressing.
+        # Theory: large DOWN bar in a downtrend → momentum continuation (DOWN), not mean-reversion (UP).
+        # This preserves full signal count while correcting direction for the regime.
+        # Expected: ~65% accuracy with ~105 bpm (both targets met simultaneously).
+        for name, (downtrend_mask, uptrend_mask) in regime_map.items():
+            if name == "rule_only":
+                continue
+            switch_signals = rule_signals.copy()
+            # In downtrend: flip UP reversion bet → DOWN momentum bet
+            switch_signals[(rule_signals == 1) & downtrend_mask] = 0
+            # In uptrend: flip DOWN reversion bet → UP momentum bet
+            switch_signals[(rule_signals == 0) & uptrend_mask] = 1
 
-        signals = best_signals
+            n_active = (switch_signals != -1).sum()
+            if n_active < 10:
+                continue
+            mask = (switch_signals != -1) & y_valid.notna()
+            if not mask.any():
+                continue
+            acc = (switch_signals[mask] == y_valid[mask]).mean()
+            bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
+            print(f"    SWITCH_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True)
+            _update_best_variants(f"SWITCH_{name}", switch_signals, n_active, acc, bpm)
+
+        # Prefer bpm >= 90 variant if it has reasonable accuracy (>= 0.58 to filter noise);
+        # otherwise fall back to the highest-accuracy bpm >= 60 variant.
+        if best_name_90 is not None and best_acc_90 >= 0.58:
+            signals = best_signals_90
+            selected_name = best_name_90
+            selected_n = best_n_90
+            selected_acc = best_acc_90
+            stage = "≥90bpm"
+        else:
+            signals = best_signals
+            selected_name = best_name
+            selected_n = best_n
+            selected_acc = best_acc
+            stage = "fallback"
+
         n_days = len(X_valid) * 15 / (60 * 24)
         print(
-            f"  BEST: {best_name}: acc={best_acc:.4f}, bpm={best_n / n_days * 30:.1f}",
+            f"  BEST [{stage}]: {selected_name}: acc={selected_acc:.4f}, bpm={selected_n / n_days * 30:.1f}",
             flush=True,
         )
 
