@@ -1652,7 +1652,11 @@ def run_step(prompt: str, step_number: int, goal_index: int = 0, goal_step: int 
             return
         step_msg_text = text
         _edit_telegram_text(step_msg_id, text, target=target)
-        smf.write_text(json.dumps({"msg_id": step_msg_id, "text": text}))
+        try:
+            smf.parent.mkdir(parents=True, exist_ok=True)
+            smf.write_text(json.dumps({"msg_id": step_msg_id, "text": text}))
+        except OSError as e:
+            _log(f"step message write failed: {e}")
         last_edit = now
 
     _reset_tokens()
