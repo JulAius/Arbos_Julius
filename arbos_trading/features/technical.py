@@ -151,6 +151,56 @@ def add_volume_lags(df: pd.DataFrame, n_lags: int = 5) -> pd.DataFrame:
     return df
 
 
+def add_order_flow_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add order flow features using taker buy volume data.
+    These are market microstructure signals not available from price alone.
+
+    Requires columns: taker_buy_base, taker_buy_quote (from Binance klines).
+    Silently skips if columns are absent.
+    """
+    if "taker_buy_base" not in df.columns or "volume" not in df.columns:
+        return df
+
+    # Buy pressure ratio: fraction of volume initiated by buyers (lifting the ask)
+    # >0.5 = more buying, <0.5 = more selling
+    df["taker_buy_ratio"] = df["taker_buy_base"] / (df["volume"] + 1e-10)
+
+    # Buy imbalance: centered at 0 (positive = net buying)
+    df["buy_imbalance"] = df["taker_buy_ratio"] - 0.5
+
+    # Rolling buy pressure (how has buying pressure evolved over last 5 bars)
+    df["taker_buy_ratio_ma5"] = df["taker_buy_ratio"].rolling(5).mean()
+    df["taker_buy_ratio_ma20"] = df["taker_buy_ratio"].rolling(20).mean()
+
+    # Z-score of buy ratio vs recent baseline (how unusual is current buying)
+    ratio_std = df["taker_buy_ratio"].rolling(20).std() + 1e-10
+    df["taker_buy_ratio_z"] = (df["taker_buy_ratio"] - df["taker_buy_ratio_ma20"]) / ratio_std
+
+    # Buy pressure momentum (change in buying pressure)
+    df["buy_pressure_change"] = df["taker_buy_ratio"].diff(1)
+    df["buy_pressure_change3"] = df["taker_buy_ratio"].diff(3)
+
+    # Dollar buy flow vs sell flow (quote-volume weighted, more accurate)
+    if "taker_buy_quote" in df.columns and "quote_volume" in df.columns:
+        df["taker_buy_quote_ratio"] = df["taker_buy_quote"] / (df["quote_volume"] + 1e-10)
+        df["quote_buy_imbalance"] = df["taker_buy_quote_ratio"] - 0.5
+
+    # VWAP deviation: close vs volume-weighted average price for bar
+    # quote_volume / volume = avg price per unit volume = VWAP-ish
+    if "quote_volume" in df.columns:
+        df["vwap"] = df["quote_volume"] / (df["volume"] + 1e-10)
+        df["vwap_dev"] = (df["close"] - df["vwap"]) / (df["vwap"] + 1e-10)
+
+    # Trade intensity: trades per unit of volume (high = many small trades = retail, low = few large = institutional)
+    if "trades_count" in df.columns:
+        avg_trade_size = df["volume"] / (df["trades_count"].astype(float) + 1e-10)
+        avg_trade_size_ma = avg_trade_size.rolling(20).mean()
+        df["avg_trade_size_ratio"] = avg_trade_size / (avg_trade_size_ma + 1e-10)
+
+    return df
+
+
 def add_technical_indicators(df: pd.DataFrame, config=None) -> pd.DataFrame:
     """
     Add all technical indicators to DataFrame.
@@ -182,5 +232,8 @@ def add_technical_indicators(df: pd.DataFrame, config=None) -> pd.DataFrame:
     df["price_range"] = (df["high"] - df["low"]) / df["close"]
     df["close_open_ratio"] = df["close"] / df["open"]
     df["high_low_ratio"] = df["high"] / df["low"]
+
+    # Order flow features (only added if taker_buy data is available)
+    df = add_order_flow_features(df)
 
     return df

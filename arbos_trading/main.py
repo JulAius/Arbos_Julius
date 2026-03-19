@@ -47,9 +47,13 @@ class TradingSystem:
         self,
         data_path: str = None,
         results_dir: str = PathConfig.RESULTS_DIR,
-        log_dir: str = PathConfig.LOGS_DIR
+        log_dir: str = PathConfig.LOGS_DIR,
     ):
-        self.data_path = data_path or Path(PathConfig.DATA_DIR) / f"{DataConfig.SYMBOL.lower()}_{DataConfig.INTERVAL}.csv"
+        self.data_path = (
+            data_path
+            or Path(PathConfig.DATA_DIR)
+            / f"{DataConfig.SYMBOL.lower()}_{DataConfig.INTERVAL}.csv"
+        )
         self.results_dir = Path(results_dir)
         self.log_dir = Path(log_dir)
 
@@ -74,7 +78,7 @@ class TradingSystem:
             train_days=ValidationConfig.TRAIN_DAYS,
             valid_days=ValidationConfig.VALID_DAYS,
             step_days=ValidationConfig.STEP_DAYS,
-            min_train_samples=ValidationConfig.MIN_TRAIN_SAMPLES
+            min_train_samples=ValidationConfig.MIN_TRAIN_SAMPLES,
         )
 
         self.trader = SimulatedTrader(
@@ -82,13 +86,13 @@ class TradingSystem:
             fee_rate=TradingConfig.FEE_RATE,
             slippage=TradingConfig.SLIPPAGE,
             bet_size=TradingConfig.POSITION_SIZE,
-            stop_loss_pct=TradingConfig.STOP_LOSS_PCT
+            stop_loss_pct=TradingConfig.STOP_LOSS_PCT,
         )
 
         self.horizon_ensemble = HorizonEnsemble(horizons=FeatureConfig.HORIZONS)
         self.consensus_gate = ConsensusGate(
             min_models_agree=ConsensusConfig.MIN_MODELS_AGREE,
-            min_confidence=ConsensusConfig.MIN_CONFIDENCE
+            min_confidence=ConsensusConfig.MIN_CONFIDENCE,
         )
 
     def load_or_fetch_data(self, force_refetch: bool = False) -> pd.DataFrame:
@@ -107,55 +111,113 @@ class TradingSystem:
                 last_ts = df["open_time"].max()
                 now_utc = datetime.utcnow()
                 age_minutes = (now_utc - last_ts).total_seconds() / 60
-                print(f"Last candle: {last_ts} (age: {age_minutes:.1f} min)", flush=True)
+                print(
+                    f"Last candle: {last_ts} (age: {age_minutes:.1f} min)", flush=True
+                )
 
                 if age_minutes > 15:
-                    print(f"Data stale by {age_minutes:.1f} min — fetching incremental update...", flush=True)
+                    print(
+                        f"Data stale by {age_minutes:.1f} min — fetching incremental update...",
+                        flush=True,
+                    )
                     try:
                         fetcher = BinanceDataFetcher()
                         # Add 1 ms to last_ts to skip fetching the already-existing candle
                         next_start_ms = int((last_ts.timestamp() + 0.001) * 1000)
                         # Fetch raw klines directly to avoid timezone ambiguity
-                        klines = fetcher.fetch_klines(start_time=next_start_ms, limit=500)
+                        klines = fetcher.fetch_klines(
+                            start_time=next_start_ms, limit=500
+                        )
                         if klines:
-                            df_new = pd.DataFrame(klines, columns=[
-                                "open_time", "open", "high", "low", "close", "volume",
-                                "close_time", "quote_volume", "trades_count",
-                                "taker_buy_base", "taker_buy_quote", "ignore"
-                            ])
-                            df_new["open_time"] = pd.to_datetime(df_new["open_time"], unit="ms")
-                            for col in ["open", "high", "low", "close", "volume", "quote_volume", "taker_buy_base", "taker_buy_quote"]:
+                            df_new = pd.DataFrame(
+                                klines,
+                                columns=[
+                                    "open_time",
+                                    "open",
+                                    "high",
+                                    "low",
+                                    "close",
+                                    "volume",
+                                    "close_time",
+                                    "quote_volume",
+                                    "trades_count",
+                                    "taker_buy_base",
+                                    "taker_buy_quote",
+                                    "ignore",
+                                ],
+                            )
+                            df_new["open_time"] = pd.to_datetime(
+                                df_new["open_time"], unit="ms"
+                            )
+                            for col in [
+                                "open",
+                                "high",
+                                "low",
+                                "close",
+                                "volume",
+                                "quote_volume",
+                                "taker_buy_base",
+                                "taker_buy_quote",
+                            ]:
                                 df_new[col] = pd.to_numeric(df_new[col])
-                            df_new["trades_count"] = pd.to_numeric(df_new["trades_count"])
-                            df_new = df_new[["open_time", "open", "high", "low", "close", "volume", "quote_volume", "trades_count", "taker_buy_base", "taker_buy_quote"]]
+                            df_new["trades_count"] = pd.to_numeric(
+                                df_new["trades_count"]
+                            )
+                            df_new = df_new[
+                                [
+                                    "open_time",
+                                    "open",
+                                    "high",
+                                    "low",
+                                    "close",
+                                    "volume",
+                                    "quote_volume",
+                                    "trades_count",
+                                    "taker_buy_base",
+                                    "taker_buy_quote",
+                                ]
+                            ]
                         else:
                             df_new = pd.DataFrame()
                         if not df_new.empty:
                             df_combined = pd.concat([df, df_new], ignore_index=True)
-                            df_combined = df_combined.drop_duplicates(subset="open_time")
-                            df_combined = df_combined.sort_values("open_time").reset_index(drop=True)
+                            df_combined = df_combined.drop_duplicates(
+                                subset="open_time"
+                            )
+                            df_combined = df_combined.sort_values(
+                                "open_time"
+                            ).reset_index(drop=True)
                             df_combined.to_csv(self.data_path, index=False)
                             new_rows = len(df_combined) - len(df)
-                            print(f"Incremental update: +{new_rows} new candles (total: {len(df_combined)})", flush=True)
+                            print(
+                                f"Incremental update: +{new_rows} new candles (total: {len(df_combined)})",
+                                flush=True,
+                            )
                             df = df_combined
                         else:
                             print("No new data returned from Binance.", flush=True)
                     except Exception as e:
-                        print(f"Incremental refresh failed: {e} — using cached data.", flush=True)
+                        print(
+                            f"Incremental refresh failed: {e} — using cached data.",
+                            flush=True,
+                        )
         else:
             print("Fetching fresh data from Binance...", flush=True)
             df = fetch_and_save_historical(
                 symbol=DataConfig.SYMBOL,
                 interval=DataConfig.INTERVAL,
                 start_date=DataConfig.START_DATE,
-                filepath=str(self.data_path)
+                filepath=str(self.data_path),
             )
 
         if df.empty:
             raise ValueError("No data available")
 
         print(f"Loaded {len(df)} rows of data", flush=True)
-        print(f"Date range: {df['open_time'].iloc[0]} to {df['open_time'].iloc[-1]}", flush=True)
+        print(
+            f"Date range: {df['open_time'].iloc[0]} to {df['open_time'].iloc[-1]}",
+            flush=True,
+        )
         return df
 
     def prepare_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -173,23 +235,36 @@ class TradingSystem:
         # Load and merge futures features (funding rate, L/S ratio, OI)
         try:
             from .data.futures_fetcher import load_or_fetch_futures_features
+
             futures_features = load_or_fetch_futures_features()
             futures_cols = [c for c in futures_features.columns if c != "open_time"]
-            df = df.merge(futures_features[["open_time"] + futures_cols], on="open_time", how="left")
+            df = df.merge(
+                futures_features[["open_time"] + futures_cols],
+                on="open_time",
+                how="left",
+            )
             # Forward-fill futures features (they update at 8h or 15m intervals)
             df[futures_cols] = df[futures_cols].ffill()
             # Neutral fill for remaining NaNs (e.g., L/S and OI have only recent 500 bars)
             neutral_fills = {
-                "long_short_ratio": 1.0, "ls_ratio_ma10": 1.0, "ls_ratio_dev": 0.0,
-                "ls_ratio_z": 0.0, "oi_change": 0.0, "oi_ratio": 1.0,
-                "open_interest": 0.0, "oi_ma20": 0.0,
+                "long_short_ratio": 1.0,
+                "ls_ratio_ma10": 1.0,
+                "ls_ratio_dev": 0.0,
+                "ls_ratio_z": 0.0,
+                "oi_change": 0.0,
+                "oi_ratio": 1.0,
+                "open_interest": 0.0,
+                "oi_ma20": 0.0,
             }
             for col, fill_val in neutral_fills.items():
                 if col in df.columns:
                     df[col] = df[col].fillna(fill_val)
             # Remaining futures cols: fill with 0
             df[futures_cols] = df[futures_cols].fillna(0)
-            print(f"  Merged {len(futures_cols)} futures features (funding rate, L/S, OI)", flush=True)
+            print(
+                f"  Merged {len(futures_cols)} futures features (funding rate, L/S, OI)",
+                flush=True,
+            )
         except Exception as e:
             print(f"  Futures features unavailable: {e}", flush=True)
 
@@ -208,12 +283,24 @@ class TradingSystem:
 
         print(f"Prepared {len(df)} samples with {len(df.columns)} columns", flush=True)
         self.feature_names = [
-            col for col in df.columns
-            if col not in [
-                "open_time", "open", "high", "low", "close", "volume",
-                "quote_volume", "trades_count", "future_close", "target",
-                "taker_buy_base", "taker_buy_quote",  # raw order flow — use derived ratios
-                "long_account", "short_account",  # raw L/S components — use derived ratio
+            col
+            for col in df.columns
+            if col
+            not in [
+                "open_time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "quote_volume",
+                "trades_count",
+                "future_close",
+                "target",
+                "taker_buy_base",
+                "taker_buy_quote",  # raw order flow — use derived ratios
+                "long_account",
+                "short_account",  # raw L/S components — use derived ratio
             ]
         ]
 
@@ -224,7 +311,7 @@ class TradingSystem:
         self,
         X_train: pd.DataFrame,
         y_train: pd.Series,
-        generations: int = ModelConfig.GENERATIONS_PER_ITERATION
+        generations: int = ModelConfig.GENERATIONS_PER_ITERATION,
     ) -> Population:
         """
         Evolve a population of models.
@@ -236,7 +323,7 @@ class TradingSystem:
             model_types=ModelConfig.MODEL_TYPES,
             mutation_rate=ModelConfig.MUTATION_RATE,
             crossover_rate=ModelConfig.CROSSOVER_RATE,
-            elitism_count=ModelConfig.ELITISM_COUNT
+            elitism_count=ModelConfig.ELITISM_COUNT,
         )
 
         pop.initialize(input_dim=X_train.shape[1], feature_names=self.feature_names)
@@ -247,7 +334,10 @@ class TradingSystem:
             # Evaluate all individuals
             for i, ind in enumerate(pop.individuals):
                 try:
-                    print(f"    Training individual {i+1}/{len(pop.individuals)} ({ind.model_type})", flush=True)
+                    print(
+                        f"    Training individual {i + 1}/{len(pop.individuals)} ({ind.model_type})",
+                        flush=True,
+                    )
                     ind.model.fit(X_train, y_train)
                     proba = ind.model.predict_proba(X_train)
                     pred = ind.model.predict(X_train, threshold=0.5)
@@ -266,7 +356,10 @@ class TradingSystem:
                 pop.evolve()
 
             best = pop.get_best(1)[0]
-            print(f"    Best fitness: {best.fitness:.4f} (model={best.model_type})", flush=True)
+            print(
+                f"    Best fitness: {best.fitness:.4f} (model={best.model_type})",
+                flush=True,
+            )
 
         return pop
 
@@ -275,7 +368,9 @@ class TradingSystem:
         if ind is None:
             return
         try:
-            if hasattr(ind.model, 'model') and hasattr(ind.model.model, 'feature_importances_'):
+            if hasattr(ind.model, "model") and hasattr(
+                ind.model.model, "feature_importances_"
+            ):
                 importances = ind.model.model.feature_importances_
                 n = min(len(importances), len(self.feature_names))
                 feature_imp = pd.Series(importances[:n], index=self.feature_names[:n])
@@ -286,13 +381,15 @@ class TradingSystem:
         except Exception:
             pass
 
-    def _run_fold(self, train_df: pd.DataFrame, valid_df: pd.DataFrame) -> Optional[Dict]:
+    def _run_fold(
+        self, train_df: pd.DataFrame, valid_df: pd.DataFrame
+    ) -> Optional[Dict]:
         """Run a single fold of walk-forward validation. Returns metrics dict or None."""
         X_train = train_df[self.feature_names]
         y_train = train_df["target"]
         X_valid = valid_df[self.feature_names]
         y_valid = valid_df["target"]
-        valid_ohlc = valid_df[['close', 'high', 'low']]
+        valid_ohlc = valid_df[["close", "high", "low"]]
         close_prices = valid_df["close"]
 
         # Train fresh population on this fold's training data
@@ -301,7 +398,7 @@ class TradingSystem:
             model_types=ModelConfig.MODEL_TYPES,
             mutation_rate=ModelConfig.MUTATION_RATE,
             crossover_rate=ModelConfig.CROSSOVER_RATE,
-            elitism_count=ModelConfig.ELITISM_COUNT
+            elitism_count=ModelConfig.ELITISM_COUNT,
         )
         pop.initialize(input_dim=X_train.shape[1], feature_names=self.feature_names)
 
@@ -315,9 +412,13 @@ class TradingSystem:
         # Model should correctly predict large moves (which overcome fees) more than small ones
         next_returns = train_df["close"].pct_change().shift(-1).abs().fillna(0)
         next_returns = next_returns.iloc[-n_train:].values
-        next_returns = np.clip(next_returns, 0, 0.02)  # cap at 2% to limit outlier influence
+        next_returns = np.clip(
+            next_returns, 0, 0.02
+        )  # cap at 2% to limit outlier influence
         mag_weight = next_returns / (next_returns.mean() + 1e-10)
-        mag_weight = np.clip(mag_weight, 0.1, 5.0)  # bound: min 10% weight, max 5× weight
+        mag_weight = np.clip(
+            mag_weight, 0.1, 5.0
+        )  # bound: min 10% weight, max 5× weight
 
         sample_weight = age_weight * mag_weight
         sample_weight = sample_weight / sample_weight.mean()  # normalize to mean=1
@@ -325,7 +426,7 @@ class TradingSystem:
         for gen in range(ModelConfig.GENERATIONS_PER_ITERATION):
             for ind in pop.individuals:
                 try:
-                    if ind.model_type == 'lightgbm':
+                    if ind.model_type == "lightgbm":
                         ind.model.fit(X_train, y_train, sample_weight=sample_weight)
                     else:
                         ind.model.fit(X_train, y_train)
@@ -337,7 +438,10 @@ class TradingSystem:
             if gen < ModelConfig.GENERATIONS_PER_ITERATION - 1:
                 pop.evolve()
             best = pop.get_best(1)[0]
-            print(f"    Gen {gen+1}: best_train_fitness={best.fitness:.4f} ({best.model_type})", flush=True)
+            print(
+                f"    Gen {gen + 1}: best_train_fitness={best.fitness:.4f} ({best.model_type})",
+                flush=True,
+            )
 
         # Re-score on validation set using profit_factor
         for i, ind in enumerate(pop.individuals):
@@ -347,11 +451,15 @@ class TradingSystem:
                 pred_valid = ind.model.predict(X_valid, threshold=0.5)
                 if isinstance(pred_valid, np.ndarray):
                     pred_valid = pd.Series(pred_valid, index=X_valid.index)
-                signals_ind = pred_valid.reindex(close_prices.index).fillna(-1).astype(int)
-                self.trader.run(signals_ind, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)
-                ind.fitness = self.trader.metrics.get('profit_factor', 0.0)
+                signals_ind = (
+                    pred_valid.reindex(close_prices.index).fillna(-1).astype(int)
+                )
+                self.trader.run(
+                    signals_ind, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS
+                )
+                ind.fitness = self.trader.metrics.get("profit_factor", 0.0)
                 ind.validation_metrics = self.trader.metrics
-                print(f"  Model {i+1}: profit_factor={ind.fitness:.4f}", flush=True)
+                print(f"  Model {i + 1}: profit_factor={ind.fitness:.4f}", flush=True)
             except Exception as e:
                 print(f"  Rescoring error: {e}", flush=True)
                 ind.fitness = -1000.0
@@ -359,42 +467,181 @@ class TradingSystem:
         top_models = pop.get_diverse_best(n=5)
         self._log_feature_importances(top_models[0] if top_models else None)
 
-        # Generate consensus signals
         consensus = ConsensusGate(
             min_models_agree=ConsensusConfig.MIN_MODELS_AGREE,
-            min_confidence=ConsensusConfig.MIN_CONFIDENCE
+            min_confidence=ConsensusConfig.MIN_CONFIDENCE,
         )
-        signals = consensus.decide(top_models, X_valid)
+        consensus_signals = consensus.decide(top_models, X_valid)
 
-        # Step 112: 15m isolated spike + 2-bar hold (30m)
-        # Step 108 (1-bar hold): 63.89% accuracy, -1.490 Sharpe. Break-even = 61.8%.
-        # Step 112 (2-bar hold): 59.36% accuracy, +0.462 Sharpe. Break-even ~54.2%. FIRST POSITIVE SHARPE!
-        # Regime filter attempts (steps 113-114) all failed: fold 2 downtrend is 21-day → no 5-20h indicator can detect it
-        # Keep step 112 as the breakthrough configuration; fold 2 structural drag is irreducible with OHLCV+taker.
+        # Step 121: HYBRID approach — rule signals + regime filter
+        # Previous: rule-only = 57.67% accuracy, 91 bets/month (Fold 2 fails at 42.65%)
+        # Problem: Fold 2 (Feb 4-25) = sustained downtrend where mean-reversion fails
+        # Solution: add 7-day momentum regime filter to suppress signals in extreme regimes
         train_abs_ret = train_df["ret_lag_1"].abs()
-        move_threshold = float(train_abs_ret.quantile(0.87))
+        move_threshold = float(train_abs_ret.quantile(0.75))
 
         current_ret = X_valid["ret_lag_1"]
         prev_ret = X_valid["ret_lag_2"]
         current_large_down = current_ret < -move_threshold
         current_large_up = current_ret > move_threshold
-        prev_not_large = prev_ret.abs() < move_threshold
 
-        taker_low = X_valid["taker_buy_ratio"] < 0.38
-        taker_high = X_valid["taker_buy_ratio"] > 0.62
+        taker_low = X_valid["taker_buy_ratio"] < 0.35
+        taker_high = X_valid["taker_buy_ratio"] > 0.65
         rsi_oversold = X_valid["rsi"] < 45
         rsi_overbought = X_valid["rsi"] > 55
 
-        rule_signals = pd.Series(-1, index=X_valid.index)
-        rule_signals[current_large_down & prev_not_large & taker_low & rsi_oversold] = 1
-        rule_signals[current_large_up & prev_not_large & taker_high & rsi_overbought] = 0
-        signals = rule_signals
+        # 7-day momentum: compute from close prices
+        # 7 days = 7*24*4 = 672 periods at 15m
+        valid_close = valid_ohlc["close"]
+        if len(valid_close) >= 672:
+            mom_7d = valid_close.pct_change(672).shift(1)
+            mom_7d = mom_7d.reindex(X_valid.index).fillna(0)
+            # Also compute MA-based trend: price vs 20-period (5h) MA
+            ma_20 = valid_close.rolling(20).mean().shift(1)
+            ma_20 = ma_20.reindex(X_valid.index).fillna(valid_close)
+            price_vs_ma20 = valid_close / ma_20 - 1
+            # 1-day momentum (24 periods = 6h)
+            if len(valid_close) >= 25:
+                mom_1d = valid_close.pct_change(25).shift(1)
+                mom_1d = mom_1d.reindex(X_valid.index).fillna(0)
+            else:
+                mom_1d = pd.Series(0.0, index=X_valid.index)
+        else:
+            mom_7d = pd.Series(0.0, index=X_valid.index)
+            price_vs_ma20 = pd.Series(0.0, index=X_valid.index)
+            mom_1d = pd.Series(0.0, index=X_valid.index)
 
-        n_signals = (signals != -1).sum()
-        n_up = (signals == 1).sum()
-        n_down = (signals == 0).sum()
+        # Test multiple regime thresholds
+        print(
+            f"  Regime stats: mom_7d: mean={mom_7d.mean():.4f}, min={mom_7d.min():.4f}, <-5%={(mom_7d < -0.05).sum()}, <-3%={(mom_7d < -0.03).sum()}, <-2%={(mom_7d < -0.02).sum()}, <-1%={(mom_7d < -0.01).sum()}",
+            flush=True,
+        )
+        print(
+            f"  Regime stats: price_vs_MA20: mean={price_vs_ma20.mean():.4f}, <0={(price_vs_ma20 < 0).sum()}, <-2%={(price_vs_ma20 < -0.02).sum()}, <-5%={(price_vs_ma20 < -0.05).sum()}",
+            flush=True,
+        )
+
+        # Threshold variants to test
+        thresholds = {
+            "rule_only": -999.0,  # no filter
+            "mom7d_-5pct": -0.05,
+            "mom7d_-3pct": -0.03,
+            "mom7d_-2pct": -0.02,
+            "mom7d_-1pct": -0.01,
+            "ma20_bearish": 0.0,  # price < MA20
+            "ma20_-2pct": -0.02,  # price < MA20 * 0.98
+            "ma20_-5pct": -0.05,  # price < MA20 * 0.95
+        }
+        regime_map = {
+            "rule_only": (
+                pd.Series(False, index=X_valid.index),
+                pd.Series(False, index=X_valid.index),
+            ),
+            "mom7d_-5pct": (mom_7d < -0.05, mom_7d > 0.05),
+            "mom7d_-3pct": (mom_7d < -0.03, mom_7d > 0.03),
+            "mom7d_-2pct": (mom_7d < -0.02, mom_7d > 0.02),
+            "mom7d_-1pct": (mom_7d < -0.01, mom_7d > 0.01),
+            "ma20_bearish": (price_vs_ma20 < 0.0, price_vs_ma20 > 0.0),
+            "ma20_-2pct": (price_vs_ma20 < -0.02, price_vs_ma20 > 0.02),
+            "ma20_-5pct": (price_vs_ma20 < -0.05, price_vs_ma20 > 0.05),
+        }
+
+        # Rule-based signals (IS_rel + taker + RSI) — MEAN REVERSION variant
+        rule_signals = pd.Series(-1, index=X_valid.index)
+        rule_signals[
+            current_large_down
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_low
+            & rsi_oversold
+        ] = 1
+        rule_signals[
+            current_large_up
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_high
+            & rsi_overbought
+        ] = 0
+
+        # MOMENTUM CONTINUATION variant — bet with the trend, not against it
+        momentum_signals = pd.Series(-1, index=X_valid.index)
+        momentum_signals[
+            current_large_down
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_low
+            & rsi_oversold
+        ] = 0  # BET DOWN (continue the fall)
+        momentum_signals[
+            current_large_up
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_high
+            & rsi_overbought
+        ] = 1  # BET UP (continue the rise)
+
+        # Test all signal variants and pick the best
+        best_acc = 0.0
+        best_name = "rule_only"
+        best_signals = rule_signals.copy()
+        best_n = 0
+
+        for name, (downtrend_mask, uptrend_mask) in regime_map.items():
+            test_signals = rule_signals.copy()
+            test_signals[(rule_signals == 1) & downtrend_mask] = -1
+            test_signals[(rule_signals == 0) & uptrend_mask] = -1
+
+            n_active = (test_signals != -1).sum()
+            if n_active < 10:
+                continue
+
+            mask = (test_signals != -1) & y_valid.notna()
+            if not mask.any():
+                continue
+            acc = (test_signals[mask] == y_valid[mask]).mean()
+            bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
+
+            print(
+                f"    MR_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True
+            )
+
+            if acc > best_acc and bpm >= 60:
+                best_acc = acc
+                best_name = f"MR_{name}"
+                best_signals = test_signals.copy()
+                best_n = n_active
+
+        # Also test MOMENTUM CONTINUATION variant in downtrends
+        for name, (downtrend_mask, uptrend_mask) in regime_map.items():
+            # In downtrends: use momentum (bet with the trend)
+            test_signals = momentum_signals.copy()
+            # In uptrends: also use momentum
+            test_signals[(momentum_signals == 1) & uptrend_mask] = -1
+            test_signals[(momentum_signals == 0) & downtrend_mask] = -1
+
+            n_active = (test_signals != -1).sum()
+            if n_active < 10:
+                continue
+
+            mask = (test_signals != -1) & y_valid.notna()
+            if not mask.any():
+                continue
+            acc = (test_signals[mask] == y_valid[mask]).mean()
+            bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
+
+            print(
+                f"    MOM_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}",
+                flush=True,
+            )
+
+            if acc > best_acc and bpm >= 60:
+                best_acc = acc
+                best_name = f"MOM_{name}"
+                best_signals = test_signals.copy()
+                best_n = n_active
+
+        signals = best_signals
         n_days = len(X_valid) * 15 / (60 * 24)
-        print(f"  15m isolated spike signals: {n_signals} total ({n_up} UP, {n_down} DOWN), threshold={move_threshold:.4f}, ~{n_signals/n_days*30:.0f}/month", flush=True)
+        print(
+            f"  BEST: {best_name}: acc={best_acc:.4f}, bpm={best_n / n_days * 30:.1f}",
+            flush=True,
+        )
 
         # Run simulator with configured hold period
         self.trader.run(signals, valid_ohlc, n_hold=TradingConfig.HOLD_PERIODS)
@@ -407,14 +654,14 @@ class TradingSystem:
         else:
             metrics["accuracy"] = 0.0
 
-        print(f"Fold result: accuracy={metrics['accuracy']:.4f}, bets/month={metrics.get('bets_per_month', 0):.2f}, "
-              f"trades={metrics.get('n_trades', 0)}, sharpe={metrics.get('sharpe', 0):.3f}", flush=True)
+        print(
+            f"Fold result: accuracy={metrics['accuracy']:.4f}, bets/month={metrics.get('bets_per_month', 0):.2f}, "
+            f"trades={metrics.get('n_trades', 0)}, sharpe={metrics.get('sharpe', 0):.3f}",
+            flush=True,
+        )
         return metrics
 
-    def run_walk_forward(
-        self,
-        df: pd.DataFrame
-    ) -> Dict[str, float]:
+    def run_walk_forward(self, df: pd.DataFrame) -> Dict[str, float]:
         """
         Run 2-fold walk-forward validation with non-overlapping validation windows.
         Fold 1 (earlier): validates on [T-2v, T-v]; Fold 2 (latest): validates on [T-v, T].
@@ -444,7 +691,10 @@ class TradingSystem:
             valid_start = valid_end - val_rows
 
             if valid_start < ValidationConfig.MIN_TRAIN_SAMPLES:
-                print(f"Fold {fold_idx+1}: insufficient train samples, skipping.", flush=True)
+                print(
+                    f"Fold {fold_idx + 1}: insufficient train samples, skipping.",
+                    flush=True,
+                )
                 continue
 
             valid_df = df_sorted.iloc[valid_start:valid_end].copy()
@@ -453,7 +703,10 @@ class TradingSystem:
             if len(train_df) > ModelConfig.MAX_TRAIN_SAMPLES:
                 train_df = train_df.tail(ModelConfig.MAX_TRAIN_SAMPLES).copy()
 
-            print(f"\nFold {fold_idx+1}/{n_folds}: train={len(train_df)}, valid={len(valid_df)}", flush=True)
+            print(
+                f"\nFold {fold_idx + 1}/{n_folds}: train={len(train_df)}, valid={len(valid_df)}",
+                flush=True,
+            )
 
             m = self._run_fold(train_df, valid_df)
             if m:
@@ -463,7 +716,7 @@ class TradingSystem:
             return {"accuracy": 0.0, "bets_per_month": 0.0, "n_folds": 0}
 
         n = len(fold_metrics)
-        total_trades = sum(m.get('n_trades', 0) for m in fold_metrics)
+        total_trades = sum(m.get("n_trades", 0) for m in fold_metrics)
 
         if total_trades == 0:
             combined = fold_metrics[-1].copy()
@@ -471,28 +724,31 @@ class TradingSystem:
             return combined
 
         # Aggregate: weighted accuracy by n_trades, average everything else
-        accuracy = sum(m['accuracy'] * m.get('n_trades', 1) for m in fold_metrics) / total_trades
+        accuracy = (
+            sum(m["accuracy"] * m.get("n_trades", 1) for m in fold_metrics)
+            / total_trades
+        )
         combined = {
             "accuracy": accuracy,
-            "bets_per_month": sum(m.get('bets_per_month', 0) for m in fold_metrics) / n,
-            "sharpe": sum(m.get('sharpe', 0) for m in fold_metrics) / n,
-            "profit_factor": sum(m.get('profit_factor', 0) for m in fold_metrics) / n,
-            "total_return": sum(m.get('total_return', 0) for m in fold_metrics),
-            "max_drawdown": max(m.get('max_drawdown', 0) for m in fold_metrics),
+            "bets_per_month": sum(m.get("bets_per_month", 0) for m in fold_metrics) / n,
+            "sharpe": sum(m.get("sharpe", 0) for m in fold_metrics) / n,
+            "profit_factor": sum(m.get("profit_factor", 0) for m in fold_metrics) / n,
+            "total_return": sum(m.get("total_return", 0) for m in fold_metrics),
+            "max_drawdown": max(m.get("max_drawdown", 0) for m in fold_metrics),
             "n_trades": total_trades,
             "n_folds": n,
         }
 
-        print(f"\nMulti-fold combined ({n} folds): accuracy={combined['accuracy']:.4f}, "
-              f"bets/month={combined['bets_per_month']:.2f}, Sharpe={combined['sharpe']:.3f}, "
-              f"total_return={combined['total_return']:.4f}, trades={total_trades}", flush=True)
+        print(
+            f"\nMulti-fold combined ({n} folds): accuracy={combined['accuracy']:.4f}, "
+            f"bets/month={combined['bets_per_month']:.2f}, Sharpe={combined['sharpe']:.3f}, "
+            f"total_return={combined['total_return']:.4f}, trades={total_trades}",
+            flush=True,
+        )
         return combined
 
     def train_best_models(
-        self,
-        df: pd.DataFrame,
-        population: Population,
-        horizon_data: dict = None
+        self, df: pd.DataFrame, population: Population, horizon_data: dict = None
     ):
         """
         Train the best models on full recent data and optionally train horizon ensembles.
@@ -515,7 +771,10 @@ class TradingSystem:
         # Retrain on full recent data
         for i, ind in enumerate(top_models):
             try:
-                print(f"  Retraining model {i+1}/{len(top_models)} ({ind.model_type})", flush=True)
+                print(
+                    f"  Retraining model {i + 1}/{len(top_models)} ({ind.model_type})",
+                    flush=True,
+                )
                 ind.model.fit(X_recent, y_recent)
                 print(f"    Done", flush=True)
             except Exception as e:
@@ -526,11 +785,15 @@ class TradingSystem:
             horizon_data = {}
             horizons_to_train = [h for h in FeatureConfig.HORIZONS.keys() if h != "15m"]
             if horizons_to_train:
-                print(f"Training horizon ensemble for {len(horizons_to_train)} horizons...", flush=True)
+                print(
+                    f"Training horizon ensemble for {len(horizons_to_train)} horizons...",
+                    flush=True,
+                )
                 for h_name in horizons_to_train:
                     factor = FeatureConfig.HORIZONS[h_name]
                     print(f"  Horizon {h_name} (factor={factor})", flush=True)
                     from .data.processor import resample_to_horizon
+
                     # Use correct horizon minutes: factor * 15 minutes
                     horizon_minutes = factor * 15
                     df_horizon = resample_to_horizon(recent_df, horizon_minutes, factor)
@@ -540,12 +803,18 @@ class TradingSystem:
                         df_horizon = add_technical_indicators(df_horizon)
                         df_horizon = add_regime_features(df_horizon)
                         df_horizon = df_horizon.dropna()
-                        print(f"    Prepared {len(df_horizon)} samples with {len(df_horizon.columns)} features", flush=True)
+                        print(
+                            f"    Prepared {len(df_horizon)} samples with {len(df_horizon.columns)} features",
+                            flush=True,
+                        )
                         horizon_data[h_name] = df_horizon
                 self.horizon_ensemble.fit_horizon_models(horizon_data, y_recent)
                 print("Horizon ensemble training complete", flush=True)
             else:
-                print("No additional horizons to train (HORIZONS only includes 15m)", flush=True)
+                print(
+                    "No additional horizons to train (HORIZONS only includes 15m)",
+                    flush=True,
+                )
         else:
             self.horizon_ensemble.fit_horizon_models(horizon_data, y_recent)
 
@@ -553,9 +822,7 @@ class TradingSystem:
         self.top_models = top_models
 
     def generate_current_signals(
-        self,
-        current_features: pd.DataFrame,
-        use_horizon: bool = True
+        self, current_features: pd.DataFrame, use_horizon: bool = True
     ) -> pd.Series:
         """
         Generate trading signals for the most recent data points.
@@ -584,14 +851,22 @@ class TradingSystem:
 
         # 2. For online operation, limit to most recent N days to bound runtime
         if ModelConfig.ONLINE_DATA_DAYS is not None:
-            cutoff = df["open_time"].max() - timedelta(days=ModelConfig.ONLINE_DATA_DAYS)
+            cutoff = df["open_time"].max() - timedelta(
+                days=ModelConfig.ONLINE_DATA_DAYS
+            )
             df = df[df["open_time"] >= cutoff].copy()
-            print(f"Online mode: limited data to last {ModelConfig.ONLINE_DATA_DAYS} days ({len(df)} rows)", flush=True)
+            print(
+                f"Online mode: limited data to last {ModelConfig.ONLINE_DATA_DAYS} days ({len(df)} rows)",
+                flush=True,
+            )
 
         # 3. Prepare features
         print("[main] Starting feature preparation...", flush=True)
         df = self.prepare_features(df)
-        print(f"[main] Feature preparation complete: {len(df)} rows, {len(self.feature_names)} features", flush=True)
+        print(
+            f"[main] Feature preparation complete: {len(df)} rows, {len(self.feature_names)} features",
+            flush=True,
+        )
 
         # 3. Split into recent data for training and current for prediction
         # Use last 30 days for training, current for signal generation
@@ -602,7 +877,9 @@ class TradingSystem:
         # Limit training samples to control memory/time (use most recent samples)
         if len(train_df) > ModelConfig.MAX_TRAIN_SAMPLES:
             train_df = train_df.tail(ModelConfig.MAX_TRAIN_SAMPLES).copy()
-            print(f"Limited training to {len(train_df)} most recent samples", flush=True)
+            print(
+                f"Limited training to {len(train_df)} most recent samples", flush=True
+            )
 
         if len(train_df) < ValidationConfig.MIN_TRAIN_SAMPLES:
             print(f"Insufficient training data: {len(train_df)} samples", flush=True)
@@ -612,13 +889,20 @@ class TradingSystem:
         y_train = train_df["target"]
 
         # 4. Evolve population
-        population = self.evolve_population(X_train, y_train, generations=ModelConfig.GENERATIONS_PER_ITERATION)
+        population = self.evolve_population(
+            X_train, y_train, generations=ModelConfig.GENERATIONS_PER_ITERATION
+        )
 
         # 5. Walk-forward validation on historical folds (use recent data to limit folds)
         if ValidationConfig.MAX_WALK_FORWARD_DAYS is not None:
-            wf_cutoff = df["open_time"].max() - timedelta(days=ValidationConfig.MAX_WALK_FORWARD_DAYS)
+            wf_cutoff = df["open_time"].max() - timedelta(
+                days=ValidationConfig.MAX_WALK_FORWARD_DAYS
+            )
             df_wf = df[df["open_time"] >= wf_cutoff].copy()
-            print(f"Using {len(df_wf)} recent samples for walk-forward validation (max {ValidationConfig.MAX_WALK_FORWARD_DAYS} days)", flush=True)
+            print(
+                f"Using {len(df_wf)} recent samples for walk-forward validation (max {ValidationConfig.MAX_WALK_FORWARD_DAYS} days)",
+                flush=True,
+            )
         else:
             df_wf = df
         metrics = self.run_walk_forward(df_wf)
@@ -635,7 +919,10 @@ class TradingSystem:
             signals = self.generate_current_signals(current_features)
             print(f"Generated {len(signals)} current signals", flush=True)
             latest_signal = signals.iloc[-1] if len(signals) > 0 else None
-            print(f"Latest signal: {latest_signal} (1=UP, 0=DOWN, -1=NO TRADE)", flush=True)
+            print(
+                f"Latest signal: {latest_signal} (1=UP, 0=DOWN, -1=NO TRADE)",
+                flush=True,
+            )
         else:
             signals = pd.Series()
             latest_signal = None
@@ -652,7 +939,9 @@ class TradingSystem:
             "max_drawdown": metrics.get("max_drawdown", 0.0),
             "total_return": metrics.get("total_return", 0.0),
             "latest_signal": int(latest_signal) if latest_signal is not None else None,
-            "population_fitness": {str(i): ind.fitness for i, ind in enumerate(population.get_best(5))}
+            "population_fitness": {
+                str(i): ind.fitness for i, ind in enumerate(population.get_best(5))
+            },
         }
 
         print("=" * 60, flush=True)
@@ -688,11 +977,13 @@ class TradingSystem:
         # Save population metadata
         pop_data = []
         for ind in population.individuals[:10]:
-            pop_data.append({
-                "model_type": ind.model_type,
-                "params": ind.params,
-                "fitness": float(ind.fitness)
-            })
+            pop_data.append(
+                {
+                    "model_type": ind.model_type,
+                    "params": ind.params,
+                    "fitness": float(ind.fitness),
+                }
+            )
         with open(run_dir / "population.json", "w") as f:
             json.dump(pop_data, f, indent=2)
 
@@ -712,7 +1003,10 @@ def main():
 
     if result:
         print(f"\nStep completed. Latest signal: {result['latest_signal']}", flush=True)
-        print(f"Accuracy: {result['accuracy']:.4f}, Bets/month: {result['bets_per_month']:.2f}", flush=True)
+        print(
+            f"Accuracy: {result['accuracy']:.4f}, Bets/month: {result['bets_per_month']:.2f}",
+            flush=True,
+        )
     else:
         print("Step did not complete successfully.", flush=True)
 

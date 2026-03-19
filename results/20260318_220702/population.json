@@ -1,0 +1,86 @@
+[
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 300,
+      "learning_rate": 0.02,
+      "num_leaves": 63,
+      "min_child_samples": 100,
+      "reg_alpha": 1.0,
+      "reg_lambda": 0.0
+    },
+    "fitness": 0.9662
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 100,
+      "learning_rate": 0.1,
+      "num_leaves": 31,
+      "min_child_samples": 100,
+      "reg_alpha": 0.5,
+      "reg_lambda": 0.5
+    },
+    "fitness": 0.9754
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 300,
+      "learning_rate": 0.02,
+      "num_leaves": 63,
+      "min_child_samples": 50,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.1
+    },
+    "fitness": 0.9988
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 200,
+      "learning_rate": 0.05,
+      "num_leaves": 31,
+      "min_child_samples": 20,
+      "reg_alpha": 0.0,
+      "reg_lambda": 1.0
+    },
+    "fitness": 0.9926
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 200,
+      "learning_rate": 0.05,
+      "num_leaves": 15,
+      "min_child_samples": 20,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.5
+    },
+    "fitness": 0.9218
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 300,
+      "learning_rate": 0.1,
+      "num_leaves": 31,
+      "min_child_samples": 100,
+      "reg_alpha": 0.1,
+      "reg_lambda": 0.1
+    },
+    "fitness": 1.0
+  },
+  {
+    "model_type": "lightgbm",
+    "params": {
+      "n_estimators": 300,
+      "learning_rate": 0.05,
+      "num_leaves": 63,
+      "min_child_samples": 100,
+      "reg_alpha": 1.0,
+      "reg_lambda": 1.0
+    },
+    "fitness": 0.9992
+  }
+]

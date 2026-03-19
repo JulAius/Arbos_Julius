@@ -96,11 +96,12 @@ class BinanceDataFetcher:
         # Convert types
         df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
         df["close_time"] = pd.to_datetime(df["close_time"], unit="ms")
-        for col in ["open", "high", "low", "close", "volume", "quote_volume"]:
+        for col in ["open", "high", "low", "close", "volume", "quote_volume", "taker_buy_base", "taker_buy_quote"]:
             df[col] = pd.to_numeric(df[col])
+        df["trades_count"] = pd.to_numeric(df["trades_count"])
 
         df = df.sort_values("open_time").reset_index(drop=True)
-        df = df[["open_time", "open", "high", "low", "close", "volume", "quote_volume", "trades_count"]]
+        df = df[["open_time", "open", "high", "low", "close", "volume", "quote_volume", "trades_count", "taker_buy_base", "taker_buy_quote"]]
 
         return df
 

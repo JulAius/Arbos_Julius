@@ -472,6 +472,8 @@ class LightGBMModel(BaseModel):
         learning_rate: float = 0.05,
         num_leaves: int = 63,
         min_child_samples: int = 20,
+        reg_alpha: float = 0.1,
+        reg_lambda: float = 0.1,
         random_state: int = 42,
         input_dim: int = None,
         **kwargs
@@ -482,6 +484,8 @@ class LightGBMModel(BaseModel):
             learning_rate=learning_rate,
             num_leaves=num_leaves,
             min_child_samples=min_child_samples,
+            reg_alpha=reg_alpha,
+            reg_lambda=reg_lambda,
             random_state=random_state,
             verbose=-1,
             n_jobs=1,
@@ -492,12 +496,14 @@ class LightGBMModel(BaseModel):
             "learning_rate": learning_rate,
             "num_leaves": num_leaves,
             "min_child_samples": min_child_samples,
+            "reg_alpha": reg_alpha,
+            "reg_lambda": reg_lambda,
             "random_state": random_state,
         }
         self.is_fitted = False
 
-    def fit(self, X: pd.DataFrame, y: pd.Series) -> "LightGBMModel":
-        self.model.fit(X, y)
+    def fit(self, X: pd.DataFrame, y: pd.Series, sample_weight=None) -> "LightGBMModel":
+        self.model.fit(X, y, sample_weight=sample_weight)
         self.is_fitted = True
         return self
 

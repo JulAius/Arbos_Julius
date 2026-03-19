@@ -1,0 +1,153 @@
+[main] main() started
+============================================================
+RUNNING ONLINE STEP
+============================================================
+Loading data from data/btcusdt_15m.csv
+Last candle: 2026-03-19 00:00:00 (age: 12.6 min)
+Loaded 77569 rows of data
+Date range: 2024-01-01 00:00:00 to 2026-03-19 00:00:00
+Online mode: limited data to last 180 days (17281 rows)
+[main] Starting feature preparation...
+Preparing features...
+[futures] Loaded cached futures features (77566 rows, age=1.0h)
+  Merged 16 futures features (funding rate, L/S, OI)
+  Generating horizon features...
+[horizon] Starting feature generation: 17281 rows, horizons=['15m']
+[horizon] Computing base 15m features...
+[horizon]   Technical indicators computed
+[horizon]   Regime features computed
+[horizon] Base features ready
+[horizon] Horizon 15m: using base features
+[horizon]   Merged (result now has 17281 rows, 85 cols)
+[horizon] Forward filling missing values...
+[horizon] Feature generation complete: 17281 rows, 85 columns
+Prepared 17251 samples with 112 columns
+Feature count: 100
+[main] Feature preparation complete: 17251 rows, 100 features
+Limited training to 5000 most recent samples
+Evolving population (input_dim=100)...
+  Generation 1/1
+    Training individual 1/7 (lightgbm)
+      -> fitness=0.9436
+    Training individual 2/7 (lightgbm)
+      -> fitness=0.9624
+    Training individual 3/7 (lightgbm)
+      -> fitness=0.9970
+    Training individual 4/7 (lightgbm)
+      -> fitness=0.9816
+    Training individual 5/7 (lightgbm)
+      -> fitness=0.8992
+    Training individual 6/7 (lightgbm)
+      -> fitness=1.0000
+    Training individual 7/7 (lightgbm)
+      -> fitness=0.9968
+    Best fitness: 1.0000 (model=lightgbm)
+Using 11521 recent samples for walk-forward validation (max 120 days)
+Running multi-fold walk-forward validation...
+
+Fold 1/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.8554 (lightgbm)
+  Model 1: profit_factor=0.7353
+  Model 2: profit_factor=0.7025
+  Model 3: profit_factor=0.7442
+  Model 4: profit_factor=0.7943
+  Model 5: profit_factor=0.6565
+  Model 6: profit_factor=0.7098
+  Model 7: profit_factor=0.7008
+
+Top 10 feature importances:
+  avg_trade_size_ratio: 111.0000
+  ret_lag_5: 108.0000
+  ret_lag_3: 103.0000
+  volume_ma_20: 97.0000
+  vol_lag_5: 96.0000
+  macd_hist: 95.0000
+  ret_lag_9: 93.0000
+  volume_ma_10: 92.0000
+  buy_pressure_change: 90.0000
+  vol_lag_2: 89.0000
+  Rule signal count: 75 (~107/month), threshold=0.0018
+Fold result: accuracy=0.5323, bets/month=2196.03, trades=1515, sharpe=-11.802
+
+Fold 2/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.9514 (lightgbm)
+  Model 1: profit_factor=0.7530
+  Model 2: profit_factor=0.7985
+  Model 3: profit_factor=0.7035
+  Model 4: profit_factor=0.8290
+  Model 5: profit_factor=0.7289
+  Model 6: profit_factor=0.7481
+  Model 7: profit_factor=0.7310
+
+Top 10 feature importances:
+  ret_lag_9: 68.0000
+  funding_rate_ma3_x: 65.0000
+  ret_lag_4: 61.0000
+  ret_lag_6: 52.0000
+  volume_ma_10: 47.0000
+  lower_shadow: 40.0000
+  ret_lag_8: 38.0000
+  bb_upper: 34.0000
+  volume_ratio_20: 32.0000
+  vol_lag_2: 32.0000
+  Rule signal count: 110 (~157/month), threshold=0.0019
+Fold result: accuracy=0.4930, bets/month=2058.32, trades=1420, sharpe=-12.771
+
+Fold 3/3: train=5000, valid=2016
+    Gen 1: best_train_fitness=0.8728 (lightgbm)
+  Model 1: profit_factor=0.8342
+  Model 2: profit_factor=0.8167
+  Model 3: profit_factor=0.8846
+  Model 4: profit_factor=0.8549
+  Model 5: profit_factor=0.8432
+  Model 6: profit_factor=0.8864
+  Model 7: profit_factor=0.8198
+
+Top 10 feature importances:
+  ret_lag_9: 107.0000
+  ret_lag_6: 99.0000
+  mom_30: 94.0000
+  obv_norm: 94.0000
+  ret_lag_5: 92.0000
+  taker_buy_ratio_ma5: 92.0000
+  macd_hist: 91.0000
+  bb_width: 91.0000
+  ret_lag_2: 88.0000
+  taker_buy_ratio_ma20: 88.0000
+  Rule signal count: 72 (~103/month), threshold=0.0024
+Fold result: accuracy=0.5340, bets/month=2190.23, trades=1511, sharpe=-5.585
+
+Multi-fold combined (3 folds): accuracy=0.5203, bets/month=2148.19, Sharpe=-10.053, total_return=-0.0630, trades=4446
+Training best models on full data...
+Recent training data: 5761 samples
+Selected 2 top models for retraining
+  Retraining model 1/2 (lightgbm)
+    Done
+  Retraining model 2/2 (lightgbm)
+    Done
+No additional horizons to train (HORIZONS only includes 15m)
+Generated 2880 current signals
+Latest signal: -1 (1=UP, 0=DOWN, -1=NO TRADE)
+Results saved to results/20260319_001323
+============================================================
+STEP COMPLETE
+Metrics: {
+  "timestamp": "2026-03-19T00:13:23.227169",
+  "accuracy": 0.5203359572939729,
+  "bets_per_month": 2148.194285714286,
+  "sharpe": -10.052715692153729,
+  "max_drawdown": 0.036766494523871936,
+  "total_return": -0.06299469689853594,
+  "latest_signal": -1,
+  "population_fitness": {
+    "0": 1.0,
+    "1": 0.997,
+    "2": 0.9968,
+    "3": 0.9816,
+    "4": 0.9624
+  }
+}
+============================================================
+
+Step completed. Latest signal: -1
+Accuracy: 0.5203, Bets/month: 2148.19

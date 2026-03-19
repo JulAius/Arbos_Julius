@@ -69,7 +69,9 @@ class Population:
             learning_rate = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_LEARNING_RATE', [0.02, 0.05, 0.1])))
             num_leaves = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_NUM_LEAVES', [31, 63, 127])))
             min_child_samples = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_MIN_CHILD_SAMPLES', [10, 20, 50])))
-            return {"n_estimators": n_estimators, "learning_rate": learning_rate, "num_leaves": num_leaves, "min_child_samples": min_child_samples}
+            reg_alpha = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_REG_ALPHA', [0.0, 0.1, 0.5])))
+            reg_lambda = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_REG_LAMBDA', [0.0, 0.1, 0.5])))
+            return {"n_estimators": n_estimators, "learning_rate": learning_rate, "num_leaves": num_leaves, "min_child_samples": min_child_samples, "reg_alpha": reg_alpha, "reg_lambda": reg_lambda}
         elif model_type == "extra_trees":
             n_estimators = int(np.random.choice(getattr(ModelConfig, 'EXTRA_TREES_N_ESTIMATORS', [50, 100])))
             max_depth = random.choice(getattr(ModelConfig, 'EXTRA_TREES_MAX_DEPTH', [8, 10, 12]))
@@ -161,6 +163,10 @@ class Population:
                 new_params["num_leaves"] = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_NUM_LEAVES', [31, 63, 127])))
             if random.random() < 0.3:
                 new_params["min_child_samples"] = int(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_MIN_CHILD_SAMPLES', [10, 20, 50])))
+            if random.random() < 0.3:
+                new_params["reg_alpha"] = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_REG_ALPHA', [0.0, 0.1, 0.5])))
+            if random.random() < 0.3:
+                new_params["reg_lambda"] = float(np.random.choice(getattr(ModelConfig, 'LIGHTGBM_REG_LAMBDA', [0.0, 0.1, 0.5])))
         elif model_type == "extra_trees":
             if random.random() < 0.5:
                 new_params["n_estimators"] = int(np.random.choice(getattr(ModelConfig, 'EXTRA_TREES_N_ESTIMATORS', [50, 100])))
