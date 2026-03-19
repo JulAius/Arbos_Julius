@@ -490,6 +490,22 @@ class TradingSystem:
         rsi_oversold = X_valid["rsi"] < 45
         rsi_overbought = X_valid["rsi"] > 55
 
+        # Volume spike confirmation: high volume = exhaustion/conviction move more likely to revert
+        _vol_col = "volume_ratio_20" if "volume_ratio_20" in X_valid.columns else None
+        if _vol_col is not None:
+            volume_spike = X_valid[_vol_col] > 1.5  # 50% above 20-bar avg = high-volume bar
+        else:
+            volume_spike = pd.Series(True, index=X_valid.index)  # default: always true if no vol data
+
+        # Consecutive down bars: DOWN move after multiple falling bars = stronger exhaustion signal
+        # ret_lag_2 and ret_lag_3 are the 2nd and 3rd most recent bars
+        _rl2 = X_valid.get("ret_lag_2", pd.Series(0.0, index=X_valid.index)) if hasattr(X_valid, 'get') else X_valid["ret_lag_2"] if "ret_lag_2" in X_valid.columns else pd.Series(0.0, index=X_valid.index)
+        _rl3 = X_valid.get("ret_lag_3", pd.Series(0.0, index=X_valid.index)) if hasattr(X_valid, 'get') else X_valid["ret_lag_3"] if "ret_lag_3" in X_valid.columns else pd.Series(0.0, index=X_valid.index)
+        prev2_down = (_rl2 < 0) if "ret_lag_2" in X_valid.columns else pd.Series(True, index=X_valid.index)
+        prev3_down = (_rl3 < 0) if "ret_lag_3" in X_valid.columns else pd.Series(True, index=X_valid.index)
+        consecutive_down_2 = prev2_down  # at least 1 more bar was down before the spike
+        consecutive_down_3 = prev2_down & prev3_down  # 2+ bars down before spike
+
         # 7-day momentum: compute from close prices
         # 7 days = 7*24*4 = 672 periods at 15m
         valid_close = valid_ohlc["close"]
@@ -522,6 +538,34 @@ class TradingSystem:
         else:
             mom_5d = pd.Series(0.0, index=X_valid.index)
 
+        # Funding rate regime: persistent negative funding = shorts being paid = confirmed downtrend
+        # Column may be renamed with _x suffix after horizon merge (e.g. funding_rate_x)
+        _fr_col = next(
+            (c for c in ["funding_rate_x", "funding_rate"] if c in X_valid.columns), None
+        )
+        _fr_ma3_col = next(
+            (c for c in ["funding_rate_ma3_x", "funding_rate_ma3"] if c in X_valid.columns), None
+        )
+        if _fr_col is not None:
+            funding_bearish = X_valid[_fr_col] < 0
+            funding_bullish = X_valid[_fr_col] > 0
+            funding_strong_bearish = X_valid[_fr_col] < -0.0001
+            funding_strong_bullish = X_valid[_fr_col] > 0.0001
+        else:
+            funding_bearish = pd.Series(False, index=X_valid.index)
+            funding_bullish = pd.Series(False, index=X_valid.index)
+            funding_strong_bearish = pd.Series(False, index=X_valid.index)
+            funding_strong_bullish = pd.Series(False, index=X_valid.index)
+        # Funding MA3 regime: 3-day MA of funding rate = more stable sustained sentiment
+        if _fr_ma3_col is not None:
+            funding_ma3_bearish = X_valid[_fr_ma3_col] < 0
+            funding_ma3_strong_bearish = X_valid[_fr_ma3_col] < -0.00005
+            funding_ma3_bullish = X_valid[_fr_ma3_col] > 0
+        else:
+            funding_ma3_bearish = pd.Series(False, index=X_valid.index)
+            funding_ma3_strong_bearish = pd.Series(False, index=X_valid.index)
+            funding_ma3_bullish = pd.Series(False, index=X_valid.index)
+
         # Test multiple regime thresholds
         print(
             f"  Regime stats: mom_7d: mean={mom_7d.mean():.4f}, min={mom_7d.min():.4f}, <-5%={(mom_7d < -0.05).sum()}, <-3%={(mom_7d < -0.03).sum()}, <-2%={(mom_7d < -0.02).sum()}, <-1%={(mom_7d < -0.01).sum()}",
@@ -533,6 +577,10 @@ class TradingSystem:
         )
         print(
             f"  Regime stats: price_vs_MA20: mean={price_vs_ma20.mean():.4f}, <0={(price_vs_ma20 < 0).sum()}, <-2%={(price_vs_ma20 < -0.02).sum()}, <-5%={(price_vs_ma20 < -0.05).sum()}",
+            flush=True,
+        )
+        print(
+            f"  Regime stats: funding_bearish={funding_bearish.sum()}, funding_strong_bearish={funding_strong_bearish.sum()}, funding_ma3_bearish={funding_ma3_bearish.sum()}",
             flush=True,
         )
 
@@ -554,6 +602,29 @@ class TradingSystem:
             "ma20_bearish": (price_vs_ma20 < 0.0, price_vs_ma20 > 0.0),
             "ma20_-2pct": (price_vs_ma20 < -0.02, price_vs_ma20 > 0.02),
             "ma20_-5pct": (price_vs_ma20 < -0.05, price_vs_ma20 > 0.05),
+            # Multi-scale agreement: both mom3d AND mom7d confirm the trend (higher confidence)
+            "mom3d_and_7d_-1pct": (
+                (mom_3d < -0.01) & (mom_7d < -0.01),
+                (mom_3d > 0.01) & (mom_7d > 0.01),
+            ),
+            "mom3d_and_7d_-2pct": (
+                (mom_3d < -0.02) & (mom_7d < -0.02),
+                (mom_3d > 0.02) & (mom_7d > 0.02),
+            ),
+            "mom5d_and_7d_-1pct": (
+                (mom_5d < -0.01) & (mom_7d < -0.01),
+                (mom_5d > 0.01) & (mom_7d > 0.01),
+            ),
+            # Funding rate regime: negative funding confirms bearish regime
+            "funding_bearish": (funding_bearish, funding_bullish),
+            "funding_and_mom5d_-1pct": (
+                funding_bearish & (mom_5d < -0.01),
+                funding_bullish & (mom_5d > 0.01),
+            ),
+            "funding_and_mom7d_-2pct": (
+                funding_bearish & (mom_7d < -0.02),
+                funding_bullish & (mom_7d > 0.02),
+            ),
         }
 
         # Rule-based signals (IS_rel + taker + RSI) — MEAN REVERSION variant
@@ -584,6 +655,41 @@ class TradingSystem:
             & (prev_ret.abs() < current_ret.abs())
             & taker_high
             & rsi_overbought
+        ] = 1  # BET UP (continue the rise)
+
+        # TIGHT MR variant — stricter taker/RSI thresholds for higher precision
+        # More extreme exhaustion conditions → fewer but more reliable signals
+        taker_very_low = X_valid["taker_buy_ratio"] < 0.30
+        taker_very_high = X_valid["taker_buy_ratio"] > 0.70
+        rsi_deeply_oversold = X_valid["rsi"] < 40
+        rsi_deeply_overbought = X_valid["rsi"] > 60
+        tight_mr_signals = pd.Series(-1, index=X_valid.index)
+        tight_mr_signals[
+            current_large_down
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_very_low
+            & rsi_deeply_oversold
+        ] = 1
+        tight_mr_signals[
+            current_large_up
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_very_high
+            & rsi_deeply_overbought
+        ] = 0
+
+        # TIGHT MOMENTUM variant — same strict conditions but momentum direction
+        tight_mom_signals = pd.Series(-1, index=X_valid.index)
+        tight_mom_signals[
+            current_large_down
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_very_low
+            & rsi_deeply_oversold
+        ] = 0  # BET DOWN (continue the fall)
+        tight_mom_signals[
+            current_large_up
+            & (prev_ret.abs() < current_ret.abs())
+            & taker_very_high
+            & rsi_deeply_overbought
         ] = 1  # BET UP (continue the rise)
 
         # Step 122: Two-stage selection — prioritize bpm >= 90 variants.
@@ -673,9 +779,31 @@ class TradingSystem:
             print(f"    SWITCH_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True)
             _update_best_variants(f"SWITCH_{name}", switch_signals, n_active, acc, bpm)
 
-        # Prefer bpm >= 90 variant if it has reasonable accuracy (>= 0.58 to filter noise);
+        # Test TIGHT MR and TIGHT MOM variants with stricter taker/RSI thresholds
+        for name, (downtrend_mask, uptrend_mask) in regime_map.items():
+            for prefix, base_sig in [("TMR", tight_mr_signals), ("TMOM", tight_mom_signals)]:
+                test_signals = base_sig.copy()
+                if prefix == "TMR":
+                    test_signals[(base_sig == 1) & downtrend_mask] = -1
+                    test_signals[(base_sig == 0) & uptrend_mask] = -1
+                else:  # TMOM
+                    test_signals[(base_sig == 1) & uptrend_mask] = -1
+                    test_signals[(base_sig == 0) & downtrend_mask] = -1
+
+                n_active = (test_signals != -1).sum()
+                if n_active < 5:
+                    continue
+                mask = (test_signals != -1) & y_valid.notna()
+                if not mask.any():
+                    continue
+                acc = (test_signals[mask] == y_valid[mask]).mean()
+                bpm = n_active / (len(X_valid) * 15 / (60 * 24)) * 30
+                print(f"    {prefix}_{name}: acc={acc:.4f}, bpm={bpm:.1f}, n={n_active}", flush=True)
+                _update_best_variants(f"{prefix}_{name}", test_signals, n_active, acc, bpm)
+
+        # Prefer bpm >= 90 variant if it has reasonable accuracy (>= 0.54 to filter noise);
         # otherwise fall back to the highest-accuracy bpm >= 60 variant.
-        if best_name_90 is not None and best_acc_90 >= 0.58:
+        if best_name_90 is not None and best_acc_90 >= 0.54:
             signals = best_signals_90
             selected_name = best_name_90
             selected_n = best_n_90
