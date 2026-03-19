@@ -1204,7 +1204,8 @@ _QUOTA_PATTERNS = re.compile(
     r"rate.limit|rate_limit|429|quota|credit|billing|overloaded|"
     r"exceeded.*limit|too many requests|insufficient|capacity|"
     r"hit.*limit|resets \d|"
-    r"not logged in|authentication_failed|please run /login",
+    r"not logged in|authentication_failed|please run /login|"
+    r"authentication_error|oauth token has expired|401",
     re.IGNORECASE,
 )
 
